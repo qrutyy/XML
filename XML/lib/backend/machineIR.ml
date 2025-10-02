@@ -2,8 +2,6 @@
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
-open Angstrom
-
 type reg =
   | A of int (*function args*)
   | T of int (*temporary*)
@@ -69,7 +67,10 @@ let rec pp_instr ppf =
 let addi k r1 r2 n = k @@ Addi (r1, r2, n)
 let add k rd r1 r2 = k @@ Add (rd, r1, r2)
 let sub k rd r1 r2 = k @@ Sub (rd, r1, r2)
-let mul k rd r1 r2 = k @@ Mulw (rd, r1, r2)
+let mul k rd r1 r2 = k @@ Mul (rd, r1, r2)
+let slt k rd r1 r2 = k @@ Slt (rd, r1, r2)
+let xor k rd r1 r2 = k @@ Xor (rd, r1, r2)
+let xori k rd r1 im = k @@ Xori (rd, r1, im)
 let li k r n = k (Li (r, n))
 let ecall k = k Ecall
 let call k name = k (Call name)
