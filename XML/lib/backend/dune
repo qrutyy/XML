@@ -1,6 +1,6 @@
 (library
  (name backend)
- (public_name XML.backend)
+ (public_name XML.Backend)
  (modules codegen emission machineIR target)
  (libraries angstrom base stdio XML.Common)
  (preprocess

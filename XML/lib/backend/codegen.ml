@@ -4,12 +4,20 @@
 
 open Common.Ast
 open Format
-    open Target
-    open Emission
+open Target
+open MachineIR
+open Emission.Emission
+
+let label_counter = ref 0
+let fresh_label prefix =
+  let n = !label_counter in
+  incr label_counter;
+  prefix ^ string_of_int n
+;;
 
 type loc =
-  | Reg of string
-  | Stack of int
+  | Reg of reg 
+  | Stack of reg
 
 (* Storage for all the live-variables, their locations *)
 module Env = struct
@@ -19,6 +27,13 @@ module Env = struct
   let bind t x loc = Hashtbl.replace t x loc
   let find t x = Hashtbl.find_opt t x
 end
+
+
+let reg_is_used env r =
+  Hashtbl.fold (fun _ loc acc ->
+      acc || match loc with
+             | Reg r' -> r = r'
+             | Stack _ -> false) env false
 
 let rec split_n lst n =
   if n <= 0 then ([], lst)
@@ -33,50 +48,72 @@ let rec split_n lst n =
 let rec gen_exp env dst expr ppf =
   match expr with
   | Expression.Exp_constant (Constant.Const_integer n) ->
-        emit li dst n;
+    emit li dst n;
     env
   | Expression.Exp_ident x ->
     (match Env.find env x with
-     | Some (Reg r) ->
-        emit mv dst r;
-       env
-     | Some (Stack offset) ->
-        emit ld dst offset; 
-       env
-     | None -> failwith ("Unbound variable: " ^ x))
+     | Some (Reg r) -> if equal_reg r dst then emit mv dst r; env
+     | Some (Stack offset) -> emit ld dst offset; env
+     | None -> (* external ident: assume function name or global; move name into a register? *)
+       (* In our simple convention: trying to use an identifier as value is error *)
+       failwith ("Unbound identifier as value: " ^ x))
+  | Expression.Exp_tuple (_, _, _) ->
+    failwith "Tuples as values not supported"
   | Expression.Exp_apply (f, arg) ->
     (match f with
-     | Expression.Exp_ident op when List.mem op [ "+"; "-"; "*"; "=" ]  ->
-       let t0 = Target.temp_regs.(0) in
-       let t1 = Target.temp_regs.(1) in
+     | Expression.Exp_ident op when List.mem op [ "+"; "-"; "*"; "="; "<"; ">" ; "<="; ">=" ] ->
        (match arg with
         | Expression.Exp_tuple (a1, a2, []) ->
-          let env = gen_exp env t0 a1 ppf in
-          let env = gen_exp env t1 a2 ppf in
-          if instr <> "" then emit_bin_op f dst t0 t1;
+          let env = gen_exp env (T 0) a1 ppf in
+          let env = gen_exp env (T 1) a2 ppf in
+          emit_bin_op op dst (T 0) (T 1);
           env
-        | _ -> failwith "unsupported argument for binary operator")
+        | _ -> failwith "binary operator expects 2-tuple")
      | Expression.Exp_ident fname ->
-       let t0 = Target.temp_regs.(0) in
-       let env = gen_exp env t0 arg ppf in
-                emit mv a0 t0;
-                emit call fname;
-       if dst <> "a0" then emit mv dst a0;
-       env
+       (match arg with
+        | Expression.Exp_constant _ | Expression.Exp_ident _ | Expression.Exp_apply _ ->
+          let env = gen_exp env (T 0) arg ppf in
+          emit mv (A 0) (T 0);
+          emit call fname;
+          if dst <> (A 0) then emit mv dst (A 0);
+          env
+        | _ ->
+          let env = gen_exp env (T 0) arg ppf in
+          emit mv (A 0) (T 0);
+          emit call fname;
+          if dst <> (A 0) then emit mv dst (A 0);
+          env)
      | _ -> failwith "unsupported application")
   | Expression.Exp_if (cond, then_e, Some else_e) ->
-    let t0 = Target.temp_regs.(0) in
-    let env = gen_exp env t0 cond ppf in
-    let lbl_else = "L_else_" ^ string_of_int (Hashtbl.hash expr) in
-    let lbl_end = "L_end_" ^ string_of_int (Hashtbl.hash expr) in
-    fprintf ppf "  beq %s, x0, %s\n" t0 lbl_else;
+    let env = gen_exp env (T 0) cond ppf in
+    let lbl_else = fresh_label "else_" in
+    let lbl_end = fresh_label "end_" in
+    emit beq (T 0) Zero lbl_else;
     let env = gen_exp env dst then_e ppf in
-    fprintf ppf "  j %s\n" lbl_end;
-    fprintf ppf "%s:\n" lbl_else;
+    emit j lbl_end;
+    emit label lbl_else;
     let env = gen_exp env dst else_e ppf in
-    fprintf ppf "%s:\n" lbl_end;
+    emit label lbl_end;
     env
-  | _ -> failwith "Expression not implemented yet"
+  | Expression.Exp_fun _ ->
+    failwith "nested function values not supported"
+  | Expression.Exp_let (Expression.Nonrecursive, (vb1, vb_list), body) ->
+      let bindingsl = vb1 :: vb_list in 
+      let env = List.fold_left (fun env_acc vb ->
+        match vb.Expression.pat with
+        | Pattern.Pat_var id ->
+            (* rhs -> a0 *)
+            let env_acc = gen_exp env_acc (A 0) vb.Expression.expr ppf in
+            let loc = Reg (A 0) in
+            Env.bind env_acc id loc;
+            env_acc
+        | Pattern.Pat_construct (name, _) when name = "()" ->
+            let _ = gen_exp env_acc (A 0) vb.Expression.expr ppf in
+            env_acc
+        | _ -> failwith "let-pattern not supported in this simplified backend"
+      ) env bindingsl in
+      gen_exp env dst body ppf
+    | _ -> failwith "Not implemented"
 ;;
 
 let gen_func func_name argsl expr ppf =
@@ -89,40 +126,56 @@ let gen_func func_name argsl expr ppf =
 
 List.iteri (fun i pat ->
   match pat with
-  | Pattern.Pat_var name -> Env.bind env name (Reg Target.arg_regs.(i))
+  | Pattern.Pat_var name -> Env.bind env name (Reg (A i))
   | _ -> failwith "Pattern not supported for arg"
 ) reg_params;
 
 List.iteri (fun i pat ->
   match pat with
-  | Pattern.Pat_var name -> Env.bind env name (Stack ((i + 1) * Target.word_size))
-  | _ -> failwith "Pattern not supported for arg"
-) stack_params;
+  | Pattern.Pat_var name -> Env.bind env name (Stack (Offset((A i), ((i + 1) * Target.word_size))))
+  | _ -> failwith "Pattern not supported for arg") stack_params;
   let local_count = 4 in
   let stack_size = (2 + local_count) * Target.word_size in
-  let _env = gen_exp env Target.arg_regs.(0) expr ppf in
-    Emission.emit_prologue func_name stack_size ppf;
-    Emission.emit_epilogue ppf
+  (* Emit function prologue, then body into the queue, flush, and epilogue *)
+  emit_prologue func_name stack_size ppf;
+  let _env = gen_exp env (A 0) expr ppf in
+  flush_queue ppf;
+  emit_epilogue ppf
 ;; 
 
-
-
-let gen_program ppf program =
+let gen_start ppf =
   fprintf ppf ".global _start\n";
   fprintf ppf "_start:\n";
-  fprintf ppf "  li a0, 6\n";
-  fprintf ppf "  call fact\n";
-  fprintf ppf "  li a5, 256\n";
-  fprintf ppf "  rem a0, a0, a5\n";
-  fprintf ppf "  li a7, 93\n";
-  fprintf ppf "  ecall\n";
-List.iter (function
-    | Structure.Str_value (Expression.Recursive, (vb1, _)) ->
-      let pat = vb1.pat in
-      let exp = vb1.expr in
-      (match pat with
-                | Pattern.Pat_var name -> gen_func name (pat, []) exp ppf
-       | _ -> failwith "Unsupported pattern")
-    | _ -> ())
-  program
+  fprintf ppf "  call main\n";
+  (* result of main is already in a0 *)
+  fprintf ppf "  li a7, 93\n";   (* 93 = SYS_exit *)
+  fprintf ppf "  ecall\n\n"
+;;
+
+let gen_program ppf program =
+  (* reset fresh label counter for determinism per program *)
+  label_counter := 0;
+  let has_main =
+    List.exists (function
+      | Structure.Str_value (_, (vb1, vbl)) ->
+        let vbs = vb1 :: vbl in
+        List.exists (fun vb -> match vb.Expression.pat with Pattern.Pat_var "main" -> true | _ -> false) vbs
+      | _ -> false
+    ) program
+  in
+  if has_main then gen_start ppf;
+
+  List.iter (function
+    | Structure.Str_value (_rec_flag, (vb1, vbl)) ->
+      let vbs = vb1 :: vbl in
+      List.iter (fun vb ->
+        match vb.Expression.pat, vb.Expression.expr with
+        | Pattern.Pat_var name, Expression.Exp_fun (args, body) ->
+            gen_func name args body ppf
+        | Pattern.Pat_var _name, _ ->
+            failwith "Top-level non-function let is not supported"
+        | _ -> failwith "unsupported pattern"
+      ) vbs
+    | _ -> ()
+  ) program
 ;;
