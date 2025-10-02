@@ -100,7 +100,8 @@ end
 
 module TypeExpr = struct
   type t =
-    | Type_arrow of t * t (** [Type_arrow(T1, T2)] represents:
+    | Type_arrow of t * t
+    (** [Type_arrow(T1, T2)] represents:
                               [T1 -> T2] *)
     | Type_var of (ident[@gen gen_ident])
     | Type_tuple of t List2.t (** [Type_tuple([T1, T2, ... Tn])] *)
@@ -168,7 +169,8 @@ module Expression = struct
     | Exp_fun of (Pattern.t[@gen Pattern.gen_sized (n / 2)]) List1.t * t
     (**[Exp_fun (P1, [P2; ...; Pn], E)] represents:
        [fun P1 ... Pn -> E] *)
-    | Exp_apply of t * t (** [Pexp_apply(E0, E1)]
+    | Exp_apply of t * t
+    (** [Pexp_apply(E0, E1)]
                              represents [E0 E1]*)
     | Exp_match of t * (t case[@gen gen_case gen_sized (n / 2)]) List1.t
     (** [match E0 with P1 -> E1 || Pn -> En] *)

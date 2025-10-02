@@ -93,8 +93,8 @@ let pconststring =
   *> lift
        (fun str -> Constant.Const_string str)
        (take_while (function
-         | '"' -> false
-         | _ -> true))
+          | '"' -> false
+          | _ -> true))
   <* token "\""
 ;;
 
@@ -246,7 +246,7 @@ let ppatlist ppat =
   return
     (Stdlib.List.fold_right
        (fun x y ->
-         Ast.Pattern.Pat_construct ("::", Some (Ast.Pattern.Pat_tuple (x, y, []))))
+          Ast.Pattern.Pat_construct ("::", Some (Ast.Pattern.Pat_tuple (x, y, []))))
        list
        (Ast.Pattern.Pat_construct ("[]", None)))
 ;;
@@ -256,10 +256,9 @@ let ppatcons ppat =
     let* pat = ppat in
     token "::"
     >>= (fun c ->
-          consparser ()
-          >>= fun rest ->
-          return
-            (Ast.Pattern.Pat_construct (c, Some (Ast.Pattern.Pat_tuple (pat, rest, [])))))
+    consparser ()
+    >>= fun rest ->
+    return (Ast.Pattern.Pat_construct (c, Some (Ast.Pattern.Pat_tuple (pat, rest, [])))))
     <|> return pat
   in
   consparser ()
@@ -332,11 +331,10 @@ let pexpcons expr =
     let* exp = expr in
     token "::"
     >>= (fun _ ->
-          consparser ()
-          >>= fun rest ->
-          return
-            (Ast.Expression.Exp_construct
-               ("::", Some (Ast.Expression.Exp_tuple (exp, rest, [])))))
+    consparser ()
+    >>= fun rest ->
+    return
+      (Ast.Expression.Exp_construct ("::", Some (Ast.Expression.Exp_tuple (exp, rest, [])))))
     <|> return exp
   in
   consparser ()
@@ -445,7 +443,7 @@ let pifexpr pexpr =
 let pfunexpr pexpr =
   lift3
     (fun first_pattern rest_patterns body_expr ->
-      Expression.Exp_fun ((first_pattern, rest_patterns), body_expr))
+       Expression.Exp_fun ((first_pattern, rest_patterns), body_expr))
     (token "fun" *> ppattern)
     (many ppattern)
     (token "->" *> pexpr)
