@@ -4,7 +4,7 @@
 
 open Base
 open Format
-open MachineIR
+open Machine
 open Target
 
 module Emission = struct

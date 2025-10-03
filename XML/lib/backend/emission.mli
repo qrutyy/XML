@@ -1,10 +1,14 @@
+(** Copyright 2024, Mikhail Gavrilenko, Daniil Rudnev-Stepanyan*)
+
+(** SPDX-License-Identifier: LGPL-3.0-or-later *)
+
 module Emission :
   sig
-    val code : (MachineIR.instr * string) Base.Queue.t
-    val emit : ?comm:string -> ((MachineIR.instr -> unit) -> 'a) -> 'a
+    val code : (Machine.instr * string) Base.Queue.t
+    val emit : ?comm:string -> ((Machine.instr -> unit) -> 'a) -> 'a
     val flush_queue : Format.formatter -> unit
     val emit_bin_op :
-      string -> MachineIR.reg -> MachineIR.reg -> MachineIR.reg -> unit
+      string -> Machine.reg -> Machine.reg -> Machine.reg -> unit
     val emit_prologue : string -> int -> Format.formatter -> unit
     val emit_epilogue : Format.formatter -> unit
   end

@@ -5,7 +5,7 @@
 open Common.Ast
 open Format
 open Target
-open MachineIR
+open Machine
 open Emission.Emission
 
 let label_counter = ref 0
