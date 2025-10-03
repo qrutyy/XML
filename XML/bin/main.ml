@@ -23,17 +23,23 @@ let read_all_from_channel ic =
 ;;
 
 let usage () =
-  eprintf "Usage: XML [file]\n";
+  eprintf "Usage: XML [input_file] [output_file]\n";
   exit 2
 ;;
 
 let () =
   let args = Sys.get_argv () |> Array.to_list |> List.tl_exn in
-  let source =
+  let source_file, output_file =
     match args with
-    | [] -> read_all_from_channel In_channel.stdin
-    | [ file ] -> In_channel.with_file file ~f:read_all_from_channel
+    | [] -> (None, "out.ll")
+    | [ file ] -> (Some file, "out.ll")
+    | [ file; out ] -> (Some file, out)
     | _ -> usage ()
+  in
+  let source =
+    match source_file with
+    | None -> read_all_from_channel In_channel.stdin
+    | Some file -> In_channel.with_file file ~f:read_all_from_channel
   in
   let ast = parse_str source in
   let asm =
@@ -43,5 +49,6 @@ let () =
     Format.pp_print_flush ppf ();
     Buffer.contents buf
   in
-  Out_channel.output_string Out_channel.stdout asm
+  Out_channel.with_file output_file ~f:(fun oc ->
+      Out_channel.output_string oc asm)
 ;;
