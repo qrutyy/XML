@@ -27,7 +27,7 @@ type instr =
   | Mul of reg * reg * reg
   | Slt of reg * reg * reg
   | Xor of reg * reg * reg
-  | Xori of reg * reg * reg
+  | Xori of reg * reg * int
   | Li of reg * int
   | Ecall
   | Call of string
@@ -47,13 +47,13 @@ type instr =
 let rec pp_instr ppf =
   let open Format in
   function
-  | Addi (r1, r2, n) -> fprintf ppf "addi %a, %a, %d" pp_reg r1 pp_reg r2 n
+  | Addi (r1, r2, im) -> fprintf ppf "addi %a, %a, %d" pp_reg r1 pp_reg r2 im
   | Add (rd, r1, r2) -> fprintf ppf "add %a, %a, %a" pp_reg rd pp_reg r1 pp_reg r2
   | Sub (rd, r1, r2) -> fprintf ppf "sub %a, %a, %a" pp_reg rd pp_reg r1 pp_reg r2
   | Mul (rd, r1, r2) -> fprintf ppf "mul %a, %a, %a" pp_reg rd pp_reg r1 pp_reg r2
   | Slt (rd, r1, r2) -> fprintf ppf "slt %a, %a, %a" pp_reg rd pp_reg r1 pp_reg r2
   | Xor (rd, r1, r2) -> fprintf ppf "xor %a, %a, %a" pp_reg rd pp_reg r1 pp_reg r2
-  | Xori (rd, r1, im) -> fprintf ppf "xori %a, %a, %a" pp_reg rd pp_reg r1 pp_reg im
+  | Xori (rd, r1, im) -> fprintf ppf "xori %a, %a, %d" pp_reg rd pp_reg r1 im
   | Li (r1, n) -> fprintf ppf "li %a, %d" pp_reg r1 n
   | Ecall -> fprintf ppf "ecall"
   | Call s -> fprintf ppf "call %s" s

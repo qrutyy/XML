@@ -2,6 +2,7 @@
  (public_name XML)
  (name main)
  (modules main)
+ (libraries XML.Common XML.Backend base stdio)
  (instrumentation
   (backend bisect_ppx)))
 

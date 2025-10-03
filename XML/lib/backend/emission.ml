@@ -36,10 +36,10 @@ module Emission = struct
     | ">" -> emit slt rd r2 r1
     | "<=" ->
       emit slt rd r2 r1;
-      emit xori rd rd (T 1)
+      emit xori rd rd 1
     | ">=" ->
       emit slt rd r1 r2;
-      emit xori rd rd (T 1)
+      emit xori rd rd 1
     | _ -> failwith "Not implemented"
   ;;
 

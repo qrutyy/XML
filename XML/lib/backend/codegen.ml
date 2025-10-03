@@ -172,8 +172,13 @@ let gen_program ppf program =
         match vb.Expression.pat, vb.Expression.expr with
         | Pattern.Pat_var name, Expression.Exp_fun (args, body) ->
             gen_func name args body ppf
+            | Pattern.Pat_var "main", expr ->
+              emit_prologue "main" (4 * Target.word_size) ppf;
+              let _env = gen_exp (Env.empty ()) (A 0) expr ppf in
+              flush_queue ppf;
+              emit_epilogue ppf
         | Pattern.Pat_var _name, _ ->
-            failwith "Top-level non-function let is not supported"
+            ()
         | _ -> failwith "unsupported pattern"
       ) vbs
     | _ -> ()

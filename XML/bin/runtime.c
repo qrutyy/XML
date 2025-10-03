@@ -3,8 +3,9 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 void print_int(int64_t n) {
-    putchar(n);
+    printf("%" PRId64, n);
     fflush(stdout);
 }
