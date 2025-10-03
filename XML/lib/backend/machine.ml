@@ -41,7 +41,7 @@ type instr =
   | Ble of reg * reg * string
   | J of string
   | Label of string
-  | Comment of string 
+  | Comment of string
 [@@deriving eq]
 
 let rec pp_instr ppf =
@@ -65,7 +65,7 @@ let rec pp_instr ppf =
   | Beq (r1, r2, s) -> fprintf ppf "beq %a, %a, %s" pp_reg r1 pp_reg r2 s
   | Blt (r1, r2, s) -> fprintf ppf "blt %a, %a, %s" pp_reg r1 pp_reg r2 s
   | Ble (r1, r2, s) -> fprintf ppf "ble %a, %a, %s" pp_reg r1 pp_reg r2 s
-  | J (s) -> fprintf ppf "j %s" s
+  | J s -> fprintf ppf "j %s" s
   | Label s -> fprintf ppf "%s:" s
   | Comment s -> fprintf ppf " # %s" s
 ;;
@@ -88,6 +88,6 @@ let mv k a b = k (Mv (a, b))
 let beq k r1 r2 r3 = k @@ Beq (r1, r2, r3)
 let blt k r1 r2 r3 = k @@ Blt (r1, r2, r3)
 let ble k r1 r2 r3 = k @@ Ble (r1, r2, r3)
-let j k s = k @@ (J s)
+let j k s = k @@ J s
 let comment k s = k (Comment s)
 let label k s = k (Label s)

@@ -8,6 +8,7 @@ open Base
 open Stdio
 open Common.Parser
 open Backend.Codegen
+open Llvm
 
 let read_all_from_channel ic =
   let buf = Buffer.create 4096 in
@@ -16,9 +17,12 @@ let read_all_from_channel ic =
        let line = In_channel.input_line ic in
        match line with
        | None -> raise End_of_file
-       | Some l -> Buffer.add_string buf l; Buffer.add_char buf '\n'
+       | Some l ->
+         Buffer.add_string buf l;
+         Buffer.add_char buf '\n'
      done
-   with End_of_file -> ());
+   with
+   | End_of_file -> ());
   Buffer.contents buf
 ;;
 
@@ -31,9 +35,9 @@ let () =
   let args = Sys.get_argv () |> Array.to_list |> List.tl_exn in
   let source_file, output_file =
     match args with
-    | [] -> (None, "out.ll")
-    | [ file ] -> (Some file, "out.ll")
-    | [ file; out ] -> (Some file, out)
+    | [] -> None, "out.ll"
+    | [ file ] -> Some file, "out.ll"
+    | [ file; out ] -> Some file, out
     | _ -> usage ()
   in
   let source =
@@ -49,6 +53,5 @@ let () =
     Format.pp_print_flush ppf ();
     Buffer.contents buf
   in
-  Out_channel.with_file output_file ~f:(fun oc ->
-      Out_channel.output_string oc asm)
+  Out_channel.with_file output_file ~f:(fun oc -> Out_channel.output_string oc asm)
 ;;

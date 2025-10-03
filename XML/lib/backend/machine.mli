@@ -2,12 +2,17 @@
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
-type reg = A of int | T of int | S of int | Zero | Offset of reg * int
+type reg =
+  | A of int
+  | T of int
+  | S of int
+  | Zero
+  | Offset of reg * int
 
 val pp_reg : Format.formatter -> reg -> unit
 
 type instr =
-    Addi of reg * reg * int
+  | Addi of reg * reg * int
   | Add of reg * reg * reg
   | Sub of reg * reg * reg
   | Mul of reg * reg * reg
@@ -30,7 +35,6 @@ type instr =
   | Comment of string
 
 val pp_instr : Format.formatter -> instr -> unit
-
 val addi : (instr -> 'a) -> reg -> reg -> int -> 'a
 val add : (instr -> 'a) -> reg -> reg -> reg -> 'a
 val sub : (instr -> 'a) -> reg -> reg -> reg -> 'a

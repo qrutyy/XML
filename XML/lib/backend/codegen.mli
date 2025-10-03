@@ -6,5 +6,4 @@ open Format
 open Common.Ast
 
 (* gens program on riscv asm from the ast *)
-val gen_program: formatter -> Structure.structure_item list -> unit
-
+val gen_program : formatter -> Structure.structure_item list -> unit
