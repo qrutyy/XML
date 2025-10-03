@@ -5,4 +5,5 @@
 | akaML | [Заикин](https://github.com/Friend-zva) | [Родионов](https://github.com/RodionovMaxim05)
 | ZOVML | Орешин | Дмитриевцев
 | PudgeWithMoML | [Насретдинов](https://github.com/Ycyken) | [Комбаев](https://github.com/homka122/)
+| XML | [Гавриленко](https://github.com/qrutyy) | [Руднев-Степанян](https://github.com/Dabzelos)
 | demo | [@Kakadu](http://github.com/Kakadu) | BOSS |
