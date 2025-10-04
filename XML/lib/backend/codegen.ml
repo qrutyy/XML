@@ -1,4 +1,4 @@
-(** Copyright 2024, Mikhail Gavrilenko, Daniil Rudnev-Stepanyan*)
+(** Copyright 2024, Mikhail Gavrilenko, Danila Rudnev-Stepanyan*)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
@@ -60,7 +60,7 @@ let rec gen_exp env dst expr ppf =
   | Expression.Exp_ident x ->
     (match Env.find env x with
      | Some (Reg r) ->
-       if equal_reg r dst then emit mv dst r;
+       if not (equal_reg r dst) then emit mv dst r;
        env
      | Some (Stack offset) ->
        emit ld dst offset;
@@ -74,15 +74,11 @@ let rec gen_exp env dst expr ppf =
     (match f with
      | Expression.Exp_ident op
        when List.mem op [ "+"; "-"; "*"; "="; "<"; ">"; "<="; ">=" ] ->
-
        (match arg with
-| Expression.Exp_tuple (a1, a2, []) ->
+        | Expression.Exp_tuple (a1, a2, []) ->
           let env = gen_exp env (T 0) a1 ppf in
-
           emit mv (T 2) (T 0);
-
           let env = gen_exp env (T 1) a2 ppf in
-
           emit_bin_op op dst (T 2) (T 1);
           env
         | _ -> failwith "binary operator expects 2-tuple")
@@ -92,13 +88,13 @@ let rec gen_exp env dst expr ppf =
           let env = gen_exp env (T 0) arg ppf in
           emit mv (A 0) (T 0);
           emit call fname;
-          if dst <> A 0 then emit mv dst (A 0);
+          if not (equal_reg dst (A 0)) then emit mv dst (A 0);
           env
         | _ ->
           let env = gen_exp env (T 0) arg ppf in
           emit mv (A 0) (T 0);
           emit call fname;
-          if dst <> A 0 then emit mv dst (A 0);
+          if not (equal_reg dst (A 0)) then emit mv dst (A 0);
           env)
      | _ -> failwith "unsupported application")
   | Expression.Exp_if (cond, then_e, Some else_e) ->
@@ -151,10 +147,11 @@ let gen_func func_name argsl expr ppf =
     reg_params;
   List.iteri
     (fun i pat ->
-       match pat with
-       | Pattern.Pat_var name ->
-         Env.bind env name (Stack (Offset (A i, (i + 1) * Target.word_size)))
-       | _ -> failwith "Pattern not supported for arg")
+      match pat with
+      | Pattern.Pat_var name ->
+          let off = (2 * Target.word_size) + (i * Target.word_size) in
+          Env.bind env name (Stack (Offset (S 0, off)))  (* s0 == fp *)
+      | _ -> failwith "Pattern not supported for arg")
     stack_params;
   let local_count = 4 in
   let stack_size = (2 + local_count) * Target.word_size in
@@ -162,7 +159,7 @@ let gen_func func_name argsl expr ppf =
   emit_prologue func_name stack_size ppf;
   let _env = gen_exp env (A 0) expr ppf in
   flush_queue ppf;
-  emit_epilogue ppf
+  emit_epilogue stack_size ppf
 ;;
 
 let gen_start ppf =
@@ -206,7 +203,7 @@ let gen_program ppf program =
                emit_prologue "main" (4 * Target.word_size) ppf;
                let _env = gen_exp (Env.empty ()) (A 0) expr ppf in
                flush_queue ppf;
-               emit_epilogue ppf
+               emit_epilogue 64 ppf
              | Pattern.Pat_var _name, _ -> ()
              | _ -> failwith "unsupported pattern")
           vbs

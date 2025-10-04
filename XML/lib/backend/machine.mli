@@ -1,4 +1,4 @@
-(** Copyright 2024, Mikhail Gavrilenko, Daniil Rudnev-Stepanyan*)
+(** Copyright 2024, Mikhail Gavrilenko, Danila Rudnev-Stepanyan*)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
@@ -9,6 +9,7 @@ type reg =
   | Zero
   | Offset of reg * int
 
+val equal_reg : reg -> reg -> bool
 val pp_reg : Format.formatter -> reg -> unit
 
 type instr =

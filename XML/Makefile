@@ -1,9 +1,22 @@
-.PHONY: all test
+.PHONY: all test exec fmt lint zanuda
 all:
 	dune build
 
 test:
 	dune test
+
+exec:
+	dune exec XML
+
+fmt:
+	dune build @fmt --auto-promote
+
+lint:
+	dune build @lint --force
+
+zanuda:
+	dune build @check @runtest -j4
+	zanuda -dir .
 
 TEST_COV_D = /tmp/cov
 COVERAGE_OPTS = --coverage-path $(TEST_COV_D) --expect bin/

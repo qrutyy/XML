@@ -1,4 +1,4 @@
-(** Copyright 2024, Mikhail Gavrilenko, Daniil Rudnev-Stepanyan*)
+(** Copyright 2024, Mikhail Gavrilenko, Danila Rudnev-Stepanyan*)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
@@ -30,8 +30,9 @@ module Emission = struct
     | "=" ->
       let t = T 0 in
       emit slt rd r1 r2;
-      emit slt t r2 r1;
-      emit xor rd rd t
+      emit slt t  r2 r1;
+      emit xor rd rd t;
+      emit xori rd rd 1
     | "<" -> emit slt rd r1 r2
     | ">" -> emit slt rd r2 r1
     | "<=" ->
@@ -40,7 +41,7 @@ module Emission = struct
     | ">=" ->
       emit slt rd r1 r2;
       emit xori rd rd 1
-    | _ -> failwith "Not implemented"
+    | _ -> failwith ("Unknown binary operator: " ^ op)
   ;;
 
   let emit_prologue name stack_size ppf =
@@ -51,10 +52,9 @@ module Emission = struct
     fprintf ppf "  addi fp, sp, %d\n" (stack_size - (2 * Target.word_size))
   ;;
 
-  let emit_epilogue ppf =
-    fprintf ppf "  addi sp, fp, 0\n";
-    fprintf ppf "  ld ra, %d(fp)\n" Target.word_size;
-    fprintf ppf "  ld fp, 0(fp)\n";
-    fprintf ppf "  ret\n"
-  ;;
+let emit_epilogue stack_size ppf =
+  fprintf ppf "  ld ra, %d(fp)\n" Target.word_size;
+  fprintf ppf "  ld fp, 0(fp)\n";
+  fprintf ppf "  addi sp, sp, %d\n" stack_size;
+  fprintf ppf "  ret\n"
 end
