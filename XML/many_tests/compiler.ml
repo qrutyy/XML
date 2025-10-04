@@ -65,7 +65,7 @@ let main =
       sd ra, 24(sp)
       sd fp, 16(sp)
       addi fp, sp, 16
-      li t0, 3
+      li t0, 1
       mv a0, t0
       call fac
       mv t0, a0

@@ -30,7 +30,7 @@ module Emission = struct
     | "=" ->
       let t = T 0 in
       emit slt rd r1 r2;
-      emit slt t  r2 r1;
+      emit slt t r2 r1;
       emit xor rd rd t;
       emit xori rd rd 1
     | "<" -> emit slt rd r1 r2
@@ -52,9 +52,10 @@ module Emission = struct
     fprintf ppf "  addi fp, sp, %d\n" (stack_size - (2 * Target.word_size))
   ;;
 
-let emit_epilogue stack_size ppf =
-  fprintf ppf "  ld ra, %d(fp)\n" Target.word_size;
-  fprintf ppf "  ld fp, 0(fp)\n";
-  fprintf ppf "  addi sp, sp, %d\n" stack_size;
-  fprintf ppf "  ret\n"
+  let emit_epilogue stack_size ppf =
+    fprintf ppf "  ld ra, %d(fp)\n" Target.word_size;
+    fprintf ppf "  ld fp, 0(fp)\n";
+    fprintf ppf "  addi sp, sp, %d\n" stack_size;
+    fprintf ppf "  ret\n"
+  ;;
 end

@@ -7,9 +7,9 @@
 (source
  (github Kakadu/comp24))
 
-(authors "Mikhail Gavrilenko" "Daniil Rudnev-Stepanyan")
+(authors "Mikhail Gavrilenko" "Danila Rudnev-Stepanyan")
 
-(maintainers "Mikhail Gavrilenko" "Daniil Rudnev-Stepanyan")
+(maintainers "Mikhail Gavrilenko" "Danila Rudnev-Stepanyan")
 
 (license "LGPL-3.0-or-later WITH OCaml-LGPL-linking-exception")
 

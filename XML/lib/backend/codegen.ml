@@ -147,11 +147,12 @@ let gen_func func_name argsl expr ppf =
     reg_params;
   List.iteri
     (fun i pat ->
-      match pat with
-      | Pattern.Pat_var name ->
-          let off = (2 * Target.word_size) + (i * Target.word_size) in
-          Env.bind env name (Stack (Offset (S 0, off)))  (* s0 == fp *)
-      | _ -> failwith "Pattern not supported for arg")
+       match pat with
+       | Pattern.Pat_var name ->
+         let off = (2 * Target.word_size) + (i * Target.word_size) in
+         Env.bind env name (Stack (Offset (S 0, off)))
+         (* s0 == fp *)
+       | _ -> failwith "Pattern not supported for arg")
     stack_params;
   let local_count = 4 in
   let stack_size = (2 + local_count) * Target.word_size in
