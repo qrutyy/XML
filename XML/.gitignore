@@ -1,3 +1,6 @@
 /_build
 /_coverage
 
+*.s
+*.o
+*.out
