@@ -2,62 +2,115 @@
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
-open Common.Ast
+open Common.Ast.Exression
 open Format
 
 (* Immediate, atomic expressions that do not require the reduction *)
-    type im_expr = 
-        | Imm_num of int
-        | Imm_ident of ident 
-    ;;
+type im_expr =
+  | Imm_num of int
+  | Imm_ident of ident
 
 (* Complex/Computable expression *)
-    type comp_expr = 
-    | Comp_imm of im_expr
-    | Comp_binop of binop * im_expr * im_expr (* x + y *)
-    | Comp_app of im_expr * im_expr list       (* f(x, y) *)
-  | Comp_branch of im_expr * anf_expr * anf_expr      (* if c then ... else ... *)
-  | Comp_func of ident * anf_expr                (* fun x -> ... *)
+type comp_expr =
+  | Comp_imm of im_expr
+  | Comp_binop of ident * im_expr * im_expr (* x + y *)
+  | Comp_app of im_expr * im_expr list (* f(x, y) *)
+  | Comp_branch of im_expr * anf_expr * anf_expr (* if c then ... else ... *)
+  | Comp_func of ident * anf_expr (* fun x -> ... *)
+  | Comp_tuple of im_expr list
 
-type anf_expr = 
-| Anf_comp_expr of comp_expr  (* Atomic Computable Expression *)
-  | Anf_let of rec_flag * ident * comp_expr * anf_expr (* let x = cexpr in aexpr *)
+type anf_expr =
+  | Anf_comp_expr of comp_expr (* Atomic Computable Expression *)
+  | Anf_let of rec_flag * ident * comp_expr * anf_expr (* let x = cexpr in anf_expr *)
 
-
-
-let normalise_const = fun const_expr cps_k =
-    match const_expr with 
-    | Const_integer e -> Imm_num e
-    | Const_char e -> Imm_ident e 
-    | Const_string e -> Imm_ident e (* mb ident list*)
+let normalise_const =
+  fun const_expr cps_k ->
+  match const_expr with
+  | Const_integer e -> Imm_num e
+  | Const_char e -> Imm_ident e
+  | Const_string e -> Imm_ident e (* mb ident list*)
+;;
 
 (* basic list cps *)
-let normalise_list = fun expr_list cps_k = 
-    match expr_list with 
-        | hd :: tl -> normalise_expr hd (fun result_hd -> 
-    normalise_list tl (fun result_tl -> 
-    cps_k (result_hd :: result_tl)))
-    | [] -> k []
+let normalise_list =
+  fun expr_list cps_k ->
+  match expr_list with
+  | hd :: tl ->
+    normalise_expr hd (fun result_hd ->
+      normalise_list tl (fun result_tl -> cps_k (result_hd :: result_tl)))
+  | [] -> cps_k []
+;;
 
+let get_new_temp_reg =
+  let counter = ref 0 in
+  fun () ->
+    let name = "t_" ^ string_of_int !counter in
+    counter := !counter + 1;
+    name
+;;
 
 (* main ANF normalisation function *)
-let normalise_expr = fun expr cps_k =
-    match expr with
-        | Exp_ident e -> cps_k @@ Imp_ident e
-        | Exp_constant e -> cps_k @@ normalise_const e 
-        | Exp_tuple expr_l2 ->
-        match expr_l2 with 
-        | (expr1, expr2, []) ->
 
-        | Exp_apply (expr1, Exp_tuple(expr_l2)) -> 
-            when binop expr1 then
-            let op = get_binop binop
-            normalise_expr expr_l2 (fun res ->
-                let temp_reg = get_new_t_reg in 
-                let rest = k @@ Imm_ident temp_reg in 
-            match rest with 
-                | ACE (Comp_imm (Imm_ident id)) when String.equal t id ->
-          return @@ ACE (Comp_binop (op, exp1_res, exp2_res))
-        | _ ->
-          return
-          @@ Anf_let (Nonrecursive, t, Comp_binop (, exp1_res, exp2_res), rest)))
+let rec normalise_expr expr cps_k =
+  match expr with
+  | Exp_ident e -> cps_k (Imm_ident e)
+  | Exp_constant c -> cps_k (normalise_const c)
+  | Exp_tuple (expr1, expr2, rest_list) ->
+    let all_exprs = expr1 :: expr2 :: rest_list in
+    normalise_list all_exprs (fun imm_list ->
+      let temp_name = get_new_temp_reg () in
+      let rest_of_program = cps_k (Imm_ident temp_name) in
+      Anf_let (Nonrecursive, temp_name, Comp_tuple imm_list, rest_of_program))
+  | Exp_apply (Exp_ident op, Exp_tuple (expr1, expr2, []))
+    when List.mem op [ "+"; "-"; "*"; "="; "<"; ">"; "<="; ">=" ] ->
+    normalise_expr expr1 (fun v1 ->
+      normalise_expr expr2 (fun v2 ->
+        let ce =
+          match v1, v2 with
+          | Imm_num n1, Imm_num n2 ->
+            (match op with
+             | "+" -> Comp_imm (Imm_num (n1 + n2))
+             | "-" -> Comp_imm (Imm_num (n1 - n2))
+             | "*" -> Comp_imm (Imm_num (n1 * n2))
+             (* add bool_to_int for comparing *)
+             | _ -> Comp_binop (op, v1, v2))
+          | _, _ -> Comp_binop (op, v1, v2)
+        in
+        let temp_name = get_new_temp_reg () in
+        let rest_of_program = cps_k (Imm_ident temp_name) in
+        Anf_let (Nonrecursive, temp_name, ce, rest_of_program)))
+  | Exp_apply (f, arg) ->
+    let rec collect_args_and_func expr acc =
+      match expr with
+      | Exp_apply (f, arg) -> collect_args_and_func f (arg :: acc)
+      | f -> f, acc
+    in
+    let func_expr, args_exprs = collect_args_and_func expr [] in
+    normalise_expr func_expr (fun func_imm ->
+      normalise_list args_exprs (fun args_imms ->
+        let temp_name = get_new_temp_reg () in
+        let rest_of_program = cps_k (Imm_ident temp_name) in
+        Anf_let (Nonrecursive, temp_name, Comp_app (func_imm, args_imms), rest_of_program)))
+  | Exp_if (cond, then_, Some else_) ->
+    normalise_expr cond (fun cond_imm ->
+      let then_anf = normalise_expr then_ (fun res -> Anf_comp_expr (Comp_imm res)) in
+      let else_anf = normalise_expr else_ (fun res -> Anf_comp_expr (Comp_imm res)) in
+      let temp_name = get_new_temp_reg () in
+      let rest_of_program = cps_k (Imm_ident temp_name) in
+      Anf_let
+        ( Nonrecursive
+        , temp_name
+        , Comp_branch (cond_imm, then_anf, else_anf)
+        , rest_of_program ))
+  | Exp_fun ((Pattern.Pat_var x, []), body) ->
+    let body_anf = normalise_expr body (fun res -> Anf_comp_expr (Comp_imm res)) in
+    let temp_name = get_new_temp_reg () in
+    let rest_of_program = cps_k (Imm_ident temp_name) in
+    Anf_let (Nonrecursive, temp_name, Comp_func (x, body_anf), rest_of_program)
+  | Exp_let (rec_flag, ({ pat = Pattern.Pat_var x; expr = vb_expr }, []), body) ->
+    normalise_expr vb_expr (fun vb_imm ->
+      (* vb_imm - result of vb_expr reduction. linking it with x. *)
+      let rest_of_program = normalise_expr body cps_k in
+      Anf_let (rec_flag, x, Comp_imm vb_imm, rest_of_program))
+  | _ -> failwith "unsupported expression in ANF normaliser"
+;;
