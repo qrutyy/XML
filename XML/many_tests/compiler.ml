@@ -13,6 +13,107 @@ let compile_to_asm ast =
   pp_print_flush ppf ();
   Buffer.contents buf
 
+
+(*--- аст для арифметичских операций*)
+let%expect_test "add_codegen" =
+  let ast = parse_str {|
+let main =
+  let () = print_int (1 + 2) in
+  0
+;; |} in
+  let asm = compile_to_asm ast in
+  print_endline asm;
+  [%expect {|
+    .global _start
+    _start:
+      call main
+      li a7, 93
+      ecall
+
+    main:
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      li t0, 1
+      mv t2, t0
+      li t1, 2
+      add t0, t2, t1
+      mv a0, t0
+      call print_int
+      li a0, 0
+    |}]
+;;
+
+let%expect_test "sub_codegen" =
+  let ast = parse_str {|
+let main =
+  let () = print_int (5 - 3) in
+  0
+;; |} in
+  let asm = compile_to_asm ast in
+  print_endline asm;
+  [%expect {|
+    .global _start
+    _start:
+      call main
+      li a7, 93
+      ecall
+
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      addi sp, sp, 64
+      ret
+    main:
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      li t0, 5
+      mv t2, t0
+      li t1, 3
+      sub t0, t2, t1
+      mv a0, t0
+      call print_int
+      li a0, 0
+    |}]
+;;
+
+let%expect_test "mul_codegen" =
+  let ast = parse_str {|
+let main =
+  let () = print_int (6 * 7) in
+  0
+;; |} in
+  let asm = compile_to_asm ast in
+  print_endline asm;
+  [%expect {|
+    .global _start
+    _start:
+      call main
+      li a7, 93
+      ecall
+
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      addi sp, sp, 64
+      ret
+    main:
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      li t0, 6
+      mv t2, t0
+      li t1, 7
+      mul t0, t2, t1
+      mv a0, t0
+      call print_int
+      li a0, 0
+    |}]
+;;
+
+
 (* --- AST для factorial + main --- *)
 
 let%expect_test "factorial_codegen" =
@@ -31,6 +132,10 @@ let main =
       li a7, 93
       ecall
 
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      addi sp, sp, 64
+      ret
     fac:
       addi sp, sp, -48
       sd ra, 40(sp)
@@ -84,7 +189,7 @@ let%expect_test "simple let" =
 
   (Failure ": end_of_input")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 76, characters 22-41
+  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 169, characters 22-41
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 let%expect_test "factorial_basic_codegen" =
