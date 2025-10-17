@@ -18,7 +18,7 @@ let fresh_label prefix =
 
 type loc =
   | Reg of reg
-  | Stack of reg
+  | Stack of offset
 
 (* Storage for all the live-variables, their locations *)
 module Env = struct
@@ -60,7 +60,7 @@ let rec gen_exp env dst expr ppf =
   | Expression.Exp_ident x ->
     (match Env.find env x with
      | Some (Reg r) ->
-       if not (equal_reg r dst) then emit mv dst r;
+       if equal_reg r dst then emit mv dst r;
        env
      | Some (Stack offset) ->
        emit ld dst offset;
@@ -150,17 +150,17 @@ let gen_func func_name argsl expr ppf =
        match pat with
        | Pattern.Pat_var name ->
          let off = (2 * Target.word_size) + (i * Target.word_size) in
-         Env.bind env name (Stack (Offset (S 0, off)))
+         Env.bind env name (Stack (S 0, off))
          (* s0 == fp *)
        | _ -> failwith "Pattern not supported for arg")
     stack_params;
   let local_count = 4 in
   let stack_size = (2 + local_count) * Target.word_size in
   (* Emit function prologue, then body into the queue, flush, and epilogue *)
-  emit_prologue func_name stack_size ppf;
+  emit_prologue func_name stack_size;
   let _env = gen_exp env (A 0) expr ppf in
   flush_queue ppf;
-  emit_epilogue stack_size ppf
+  emit_epilogue stack_size
 ;;
 
 let gen_start ppf =
@@ -201,10 +201,10 @@ let gen_program ppf program =
              | Pattern.Pat_var name, Expression.Exp_fun (args, body) ->
                gen_func name args body ppf
              | Pattern.Pat_var "main", expr ->
-               emit_prologue "main" (4 * Target.word_size) ppf;
+               emit_prologue "main" (4 * Target.word_size);
                let _env = gen_exp (Env.empty ()) (A 0) expr ppf in
                flush_queue ppf;
-               emit_epilogue 64 ppf
+               emit_epilogue 64
              | Pattern.Pat_var _name, _ -> ()
              | _ -> failwith "unsupported pattern")
           vbs

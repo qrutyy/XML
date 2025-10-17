@@ -12,6 +12,7 @@ type reg =
 [@@deriving eq]
 
 type offset = reg * int
+[@@deriving eq]
 
 let pp_reg ppf =
   let open Format in
@@ -23,6 +24,9 @@ let pp_reg ppf =
   | RA -> fprintf ppf "ra"
   | SP -> fprintf ppf "sp"
 ;;
+
+let pp_offset ppf (reg, off) =
+  Format.fprintf ppf "%d(%a)" off pp_reg reg
 
 type instr =
   | Addi of reg * reg * int    (* ADD immediate *)
@@ -51,7 +55,7 @@ type instr =
 [@@deriving eq]
 
 
-let rec pp_instr ppf =
+let pp_instr ppf =
   let open Format in
   function
   | Addi (r1, r2, im) -> fprintf ppf "addi %a, %a, %d" pp_reg r1 pp_reg r2 im
@@ -66,8 +70,10 @@ let rec pp_instr ppf =
   | Call s -> fprintf ppf "call %s" s
   | Ret -> fprintf ppf "ret"
   | Lla (r1, s) -> fprintf ppf "lla %a, %s" pp_reg r1 s
-  | Ld (r1, r2) -> fprintf ppf "ld %a, %a" pp_reg r1 pp_reg r2
-  | Sd (r1, r2) -> fprintf ppf "sd %a, %a" pp_reg r1 pp_reg r2
+  | Ld (r1, offset) -> fprintf ppf "ld %a, %a" pp_reg r1 pp_offset offset
+  | Sd (r1, offset) -> fprintf ppf "sd %a, %a" pp_reg r1 pp_offset offset
+  | Seqz (rd, r1) -> fprintf ppf "seqz %a, %a" pp_reg rd pp_reg r1
+  | Snez (rd, r1) -> fprintf ppf "snez %a, %a" pp_reg rd pp_reg r1
   | Mv (r1, r2) -> fprintf ppf "mv %a, %a" pp_reg r1 pp_reg r2
   | Beq (r1, r2, s) -> fprintf ppf "beq %a, %a, %s" pp_reg r1 pp_reg r2 s
   | Blt (r1, r2, s) -> fprintf ppf "blt %a, %a, %s" pp_reg r1 pp_reg r2 s
@@ -95,6 +101,8 @@ let mv k a b = k (Mv (a, b))
 let beq k r1 r2 r3 = k @@ Beq (r1, r2, r3)
 let blt k r1 r2 r3 = k @@ Blt (r1, r2, r3)
 let ble k r1 r2 r3 = k @@ Ble (r1, r2, r3)
+let seqz k rd r1 = k (Seqz (rd, r1))
+let snez k rd r1 = k (Snez (rd, r1))
 let j k s = k @@ J s
 let comment k s = k (Comment s)
 let label k s = k (Label s)
