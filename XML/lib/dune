@@ -2,7 +2,7 @@
  (name XML_lib)
  (public_name XML.Lib)
  (modules)
- (libraries base angstrom ppx_deriving XML.Common XML.Backend)
+ (libraries base angstrom ppx_deriving XML.Common XML.Backend XML.Middleend)
  (preprocess
   (pps ppx_expect ppx_deriving.show ppx_deriving.eq))
  (inline_tests)
