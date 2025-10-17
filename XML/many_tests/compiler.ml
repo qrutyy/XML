@@ -554,58 +554,6 @@ let%expect_test "factorial_basic_codegen" =
   let asm = to_asm ast_factorial in
   print_endline asm;
   [%expect {|
-    fac:
-      addi sp, sp, -48
-      sd ra, 40(sp)
-      sd fp, 32(sp)
-      addi fp, sp, 32
-      mv t0, a0
-      mv t2, t0
-      li t1, 1
-      slt t0, t1, t2
-      xori t0, t0, 1
-      beq t0, x0, else_0
-      li a0, 1
-      j end_1
-    else_0:
-      mv t0, a0
-      mv t2, t0
-      mv t0, a0
-      mv t2, t0
-      li t1, 1
-      sub t0, t2, t1
-      mv a0, t0
-      call fac
-      mv t1, a0
-      mul a0, t2, t1
-    end_1:
-      ld ra, 8(fp)
-      ld fp, 0(fp)
-      addi sp, sp, 48
-      ret
-    |}]
-
-
-let%expect_test "fibonacci" =
-  let ast_factorial = parse_str "let rec fib n = if n == 0 then 0 else n + fib(n - 1);;" in
-  let asm = to_asm ast_factorial in
-  print_endline asm;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure ": end_of_input")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 83, characters 22-41
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
-
-let%expect_test "fib" =
-  let ast_factorial = parse_str "let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2);;" in
-  let asm = compile_to_asm ast_factorial in
-  print_endline asm;
-  [%expect {|
       ld ra, 8(s0)
       ld s0, 0(s0)
       addi sp, sp, 64
@@ -631,5 +579,60 @@ let%expect_test "fib" =
       call fac
       mv t1, a0
       mul a0, t2, t1
+    end_1:
+    |}]
+
+
+let%expect_test "fibonacci" =
+  let ast_factorial = parse_str "let rec fib n = if n == 0 then 0 else n + fib(n - 1);;" in
+  let asm = to_asm ast_factorial in
+  print_endline asm;
+  [%expect.unreachable]
+[@@expect.uncaught_exn {|
+  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
+     This is strongly discouraged as backtraces are fragile.
+     Please change this test to not include a backtrace. *)
+
+  (Failure ": end_of_input")
+  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
+  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 129, characters 22-88
+  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+
+let%expect_test "fib" =
+  let ast_factorial = parse_str "let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2);;" in
+  let asm = to_asm ast_factorial in
+  print_endline asm;
+  [%expect {|
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      addi sp, sp, 48
+      ret
+    fib:
+      addi sp, sp, -48
+      sd ra, 40(sp)
+      sd s0, 32(sp)
+      addi s0, sp, 32
+      mv t2, t0
+      li t1, 1
+      slt t0, t1, t2
+      xori t0, t0, 1
+      beq t0, zero, else_0
+      mv a0, a0
+      j end_1
+    else_0:
+      mv t2, t0
+      li t1, 1
+      sub t0, t2, t1
+      mv a0, t0
+      call fib
+      mv t0, a0
+      mv t2, t0
+      mv t2, t0
+      li t1, 2
+      sub t0, t2, t1
+      mv a0, t0
+      call fib
+      mv t1, a0
+      add a0, t2, t1
     end_1:
     |}]
