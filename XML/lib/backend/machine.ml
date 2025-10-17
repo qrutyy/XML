@@ -6,43 +6,50 @@ type reg =
   | A of int (*function args*)
   | T of int (*temporary*)
   | S of int (*saved*)
+  | RA 
+  | SP
   | Zero
-  | Offset of reg * int [@deriving eq]
 [@@deriving eq]
 
-let rec pp_reg ppf =
+type offset = reg * int
+
+let pp_reg ppf =
   let open Format in
   function
   | A n -> fprintf ppf "a%d" n
   | T n -> fprintf ppf "t%d" n
   | S n -> fprintf ppf "s%d" n
-  | Zero -> fprintf ppf "x0"
-  | Offset (r, n) -> fprintf ppf "%d(%a)" n pp_reg r (* ex: -8(sp) *)
+  | Zero -> fprintf ppf "zero"
+  | RA -> fprintf ppf "ra"
+  | SP -> fprintf ppf "sp"
 ;;
 
 type instr =
-  | Addi of reg * reg * int
-  | Add of reg * reg * reg
-  | Sub of reg * reg * reg
-  | Mul of reg * reg * reg
-  | Slt of reg * reg * reg
-  | Xor of reg * reg * reg
-  | Xori of reg * reg * int
-  | Li of reg * int
-  | Ecall
-  | Call of string
-  | Ret
-  | Lla of reg * string
-  | Ld of reg * reg (** [ld ra, (sp)] *)
-  | Sd of reg * reg
-  | Mv of reg * reg
-  | Beq of reg * reg * string
-  | Blt of reg * reg * string
-  | Ble of reg * reg * string
-  | J of string
-  | Label of string
-  | Comment of string
+  | Addi of reg * reg * int    (* ADD immediate *)
+  | Add  of reg * reg * reg    (* ADD *)
+  | Sub  of reg * reg * reg    (* SUB *)
+  | Mul  of reg * reg * reg    (* MUL *)
+  | Slt  of reg * reg * reg    (* SLT: set less than (signed) *)
+  | Seqz of reg * reg          (* SEQZ: set equal zero *)
+  | Snez of reg * reg          (* SNEZ: set not equal zero *)
+  | Xor  of reg * reg * reg    (* XOR *)
+  | Xori of reg * reg * int    (* XOR immediate *)
+  | Beq  of reg * reg * string (* BEQ: branch if equal *)
+  | Blt  of reg * reg * string (* BLT: branch if less than *)
+  | Ble  of reg * reg * string (* BLE: branch if less or equal *)
+  | Lla  of reg * string       (* LLA: load address *)
+  | Li   of reg * int          (* LI: load immediate *)
+  | Ld   of reg * offset       (* LD: load doubleword *)
+  | Sd   of reg * offset       (* SD: store doubleword *)
+  | Mv   of reg * reg          (* MV: move *)
+  | Comment of string          (* Assembler comment *)
+  | Label   of string          (* Assembler label *)
+  | Call of string             (* CALL *)
+  | J    of string             (* J: jump *)
+  | Ecall                      (* ECALL *)
+  | Ret                        (* return *)
 [@@deriving eq]
+
 
 let rec pp_instr ppf =
   let open Format in

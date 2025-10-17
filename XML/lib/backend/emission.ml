@@ -28,11 +28,8 @@ module Emission = struct
     | "-" -> emit sub rd r1 r2
     | "*" -> emit mul rd r1 r2
     | "=" ->
-      let t = T 0 in
-      emit slt rd r1 r2;
-      emit slt t r2 r1;
-      emit xor rd rd t;
-      emit xori rd rd 1
+      emit xor rd r1 r2;
+      emit seqz rd rd
     | "<" -> emit slt rd r1 r2
     | ">" -> emit slt rd r2 r1
     | "<=" ->
@@ -43,19 +40,28 @@ module Emission = struct
       emit xori rd rd 1
     | _ -> failwith ("Unknown binary operator: " ^ op)
   ;;
-
-  let emit_prologue name stack_size ppf =
-    fprintf ppf "%s:\n" name;
-    fprintf ppf "  addi sp, sp, -%d\n" stack_size;
-    fprintf ppf "  sd ra, %d(sp)\n" (stack_size - Target.word_size);
-    fprintf ppf "  sd fp, %d(sp)\n" (stack_size - (2 * Target.word_size));
-    fprintf ppf "  addi fp, sp, %d\n" (stack_size - (2 * Target.word_size))
+(*миша я переписал через емит чтобы у нас вся оработка шла черз один модуль*)
+  let emit_prologue name stack_size =
+    (* name: *)
+    emit label name;
+    (* addi sp, sp, -stack_size *)
+    emit addi SP SP (-stack_size);
+    (* sd ra, (sp + stack_size - word) *)
+    emit sd RA (SP, stack_size - Target.word_size);
+    (* sd fp(S0), (sp + stack_size - 2*word) *)
+    emit sd (S 0) (SP, stack_size - (2 * Target.word_size));
+    (* fp := sp + stack_size - 2*word *)
+    emit addi (S 0) SP (stack_size - (2 * Target.word_size))
   ;;
 
-  let emit_epilogue stack_size ppf =
-    fprintf ppf "  ld ra, %d(fp)\n" Target.word_size;
-    fprintf ppf "  ld fp, 0(fp)\n";
-    fprintf ppf "  addi sp, sp, %d\n" stack_size;
-    fprintf ppf "  ret\n"
+  let emit_epilogue stack_size =
+    (* ld ra, word(fp) *)
+    emit ld RA (S 0, Target.word_size);
+    (* ld fp, 0(fp) *)
+    emit ld (S 0) (S 0, 0);
+    (* addi sp, sp, stack_size *)
+    emit addi SP SP stack_size;
+    (* ret *)
+    emit ret
   ;;
 end
