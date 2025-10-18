@@ -164,13 +164,9 @@ let gen_func func_name argsl expr ppf =
 ;;
 
 let gen_start ppf =
-  fprintf ppf ".global _start\n";
-  fprintf ppf "_start:\n";
-  fprintf ppf "  call main\n";
-  (* result of main is already in a0 *)
-  fprintf ppf "  li a7, 93\n";
-  (* 93 = SYS_exit *)
-  fprintf ppf "  ecall\n\n"
+  fprintf ppf ".section .text\n";
+fprintf ppf ".global main\n";
+    fprintf ppf ".type main, @function\n";
 ;;
 
 let gen_program ppf program =
