@@ -599,7 +599,7 @@ let%expect_test "factorial_basic_codegen" =
 
 
 let%expect_test "ifs" =
-  let ast_factorial = parse_str "
+  let ast_if = parse_str "
   let large x = if 0<>x then print_int 0 else print_int 1
   let main =
   let x = if (if (if 0
@@ -608,7 +608,7 @@ let%expect_test "ifs" =
   then 0 else 1 in
   large x
   ;;" in
-  let asm = to_asm ast_factorial in
+  let asm = to_asm ast_if in
   print_endline asm;
   [%expect {|
     .section .text
