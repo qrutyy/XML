@@ -634,22 +634,96 @@ let%expect_test "ifs" =
   ;;" in
   let asm = to_asm ast_factorial in
   print_endline asm;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-  (Failure
-    "Function/Tuple values should be handled at the top level or via let-bindings")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Backend__Codegen.gen_anf_expr in file "lib/backend/codegen.ml", line 51, characters 28-63
-  Called from Backend__Codegen.gen_func in file "lib/backend/codegen.ml", line 175, characters 21-62
-  Called from Stdlib__List.iter in file "list.ml", line 112, characters 12-15
-  Called from Backend__Codegen.gen_program in file "lib/backend/codegen.ml", lines 200-210, characters 0-11
-  Called from XML_manytests__Compiler.to_asm in file "many_tests/compiler.ml", line 19, characters 2-41
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 175, characters 12-32
-  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 142, characters 10-28
-  |}]
+  [%expect {|
+    .text
+    .global _start
+    _start:
+      call main
+      li a7, 93
+      ecall
+
+    large:
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      li t0, 0
+      mv t1, a0
+      xor t2, t0, t1
+      snez t0, t2
+      sd t0, -8(s0)
+      ld t0, -8(s0)
+      beq t0, zero, else_0
+      addi sp, sp, -8
+      sd a0, 0(sp)
+      li a0, 0
+      call print_int
+      mv t0, a0
+      ld a0, 0(sp)
+      addi sp, sp, 8
+      sd t0, -16(s0)
+      ld t0, -16(s0)
+      j endif_1
+    else_0:
+      addi sp, sp, -8
+      sd a0, 0(sp)
+      li a0, 1
+      call print_int
+      mv t0, a0
+      ld a0, 0(sp)
+      addi sp, sp, 8
+      sd t0, -16(s0)
+      ld t0, -16(s0)
+    endif_1:
+      sd t0, -16(s0)
+      ld a0, -16(s0)
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      addi sp, sp, 32
+      ret
+    main:
+      addi sp, sp, -48
+      sd ra, 40(sp)
+      sd s0, 32(sp)
+      addi s0, sp, 32
+      li t0, 0
+      beq t0, zero, else_2
+      li t0, 0
+      j endif_3
+    else_2:
+      li a0, 42
+      call print_int
+      mv t0, a0
+      sd t0, -8(s0)
+      li t0, 1
+    endif_3:
+      sd t0, -8(s0)
+      ld t0, -8(s0)
+      beq t0, zero, else_4
+      li t0, 0
+      j endif_5
+    else_4:
+      li t0, 1
+    endif_5:
+      sd t0, -16(s0)
+      ld t0, -16(s0)
+      beq t0, zero, else_6
+      li t0, 0
+      j endif_7
+    else_6:
+      li t0, 1
+    endif_7:
+      sd t0, -24(s0)
+      ld a0, -24(s0)
+      call large
+      mv t0, a0
+      sd t0, -32(s0)
+      ld a0, -32(s0)
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      addi sp, sp, 48
+      ret
+    |}]
 
 let%expect_test "ifs" =
   let ast_factorial = parse_str "
@@ -663,22 +737,96 @@ let%expect_test "ifs" =
   ;;" in
   let asm = to_asm ast_factorial in
   print_endline asm;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-  (Failure
-    "Function/Tuple values should be handled at the top level or via let-bindings")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Backend__Codegen.gen_anf_expr in file "lib/backend/codegen.ml", line 51, characters 28-63
-  Called from Backend__Codegen.gen_func in file "lib/backend/codegen.ml", line 175, characters 21-62
-  Called from Stdlib__List.iter in file "list.ml", line 112, characters 12-15
-  Called from Backend__Codegen.gen_program in file "lib/backend/codegen.ml", lines 200-210, characters 0-11
-  Called from XML_manytests__Compiler.to_asm in file "many_tests/compiler.ml", line 19, characters 2-41
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 204, characters 12-32
-  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 142, characters 10-28
-  |}]
+  [%expect {|
+    .text
+    .global _start
+    _start:
+      call main
+      li a7, 93
+      ecall
+
+    large:
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      li t0, 0
+      mv t1, a0
+      xor t2, t0, t1
+      snez t0, t2
+      sd t0, -8(s0)
+      ld t0, -8(s0)
+      beq t0, zero, else_0
+      addi sp, sp, -8
+      sd a0, 0(sp)
+      li a0, 0
+      call print_int
+      mv t0, a0
+      ld a0, 0(sp)
+      addi sp, sp, 8
+      sd t0, -16(s0)
+      ld t0, -16(s0)
+      j endif_1
+    else_0:
+      addi sp, sp, -8
+      sd a0, 0(sp)
+      li a0, 1
+      call print_int
+      mv t0, a0
+      ld a0, 0(sp)
+      addi sp, sp, 8
+      sd t0, -16(s0)
+      ld t0, -16(s0)
+    endif_1:
+      sd t0, -16(s0)
+      ld a0, -16(s0)
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      addi sp, sp, 32
+      ret
+    main:
+      addi sp, sp, -48
+      sd ra, 40(sp)
+      sd s0, 32(sp)
+      addi s0, sp, 32
+      li t0, 0
+      beq t0, zero, else_2
+      li t0, 0
+      j endif_3
+    else_2:
+      li a0, 42
+      call print_int
+      mv t0, a0
+      sd t0, -8(s0)
+      li t0, 1
+    endif_3:
+      sd t0, -8(s0)
+      ld t0, -8(s0)
+      beq t0, zero, else_4
+      li t0, 0
+      j endif_5
+    else_4:
+      li t0, 1
+    endif_5:
+      sd t0, -16(s0)
+      ld t0, -16(s0)
+      beq t0, zero, else_6
+      li t0, 0
+      j endif_7
+    else_6:
+      li t0, 1
+    endif_7:
+      sd t0, -24(s0)
+      ld a0, -24(s0)
+      call large
+      mv t0, a0
+      sd t0, -32(s0)
+      ld a0, -32(s0)
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      addi sp, sp, 48
+      ret
+    |}]
 
 let%expect_test "fib" =
   let ast_factorial = parse_str "let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2)

@@ -10,6 +10,8 @@ open Machine
 open Emission.Emission
 
 let label_counter = ref 0
+(* hold the deferred functions *)
+let deferred_functions : (string * ident list * anf_expr) list ref = ref []
 
 let fresh_label prefix =
   let n = !label_counter in
@@ -118,8 +120,16 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
     let _ = gen_anf_expr else_state dst else_anf in
     emit label lbl_end;
     state
-  | Comp_func _ | Comp_tuple _ ->
-    failwith "Function/Tuple values should be handled at the top level or via let-bindings"
+| Comp_func (params, body) ->
+      let func_label = fresh_label "lambda" in
+      deferred_functions := (func_label, params, body) :: !deferred_functions;
+      emit la dst func_label; (*load address*)
+      state
+  
+  | Comp_tuple _ ->
+      (* Tuples would require heap allocation.
+         The test cases do not involve tuples. *)
+      failwith "Tuple values are not yet implemented"
 ;;
 
 (* counts the number of let bindings to allocate space on stack *)
@@ -185,10 +195,13 @@ List.iter
       | Anf_str_value (_rec_flag, name, anf_expr) ->
         let params, body =
           match anf_expr with
-          | Anf_comp_expr (Comp_func (ps, body)) -> ps, body
+          | Anf_let (_, _, Comp_func (ps, b), _) -> ps, b
           | _ -> [], anf_expr
         in
         gen_func name params body ppf)
     program;
+ List.iter
+    (fun (name, params, body) -> gen_func name params body ppf)
+    (List.rev !deferred_functions);
   flush_queue ppf
 ;;

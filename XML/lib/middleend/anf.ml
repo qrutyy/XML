@@ -65,7 +65,7 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
     let all_exprs = expr1 :: expr2 :: rest_list in
     norm_list_to_imm all_exprs (fun imm_list -> k (Comp_tuple imm_list))
   | Exp_apply (Exp_ident op, Exp_tuple (expr1, expr2, []))
-    when List.mem op [ "+"; "-"; "*"; "="; "<"; ">"; "<="; ">=" ] ->
+        when List.mem op [ "+"; "-"; "*"; "="; "<"; ">"; "<="; ">="; "<>" ] ->
     norm_to_imm expr1 (fun v1 ->
       norm_to_imm expr2 (fun v2 ->
         let ce =
@@ -98,16 +98,27 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
     if params = [] then failwith "Function with no parameters found";
     let body_anf = norm_body body in
     k (Comp_func (params, body_anf))
-  | Exp_let (rec_flag, (first_binding, other_bindings), body) ->
+| Exp_let (rec_flag, (first_binding, other_bindings), body) ->
     if other_bindings <> [] then failwith "`let ... and ...` is not supported in ANF yet";
     let { pat; expr = vb_expr } = first_binding in
     (match pat with
      | Pattern.Pat_var x ->
+       (* Нормализуем правую часть let-связывания *)
        norm_comp vb_expr (fun ce ->
-         let body_anf = norm_comp body k in
-         Anf_let (rec_flag, x, ce, body_anf))
+         (* Теперь проверяем, что получилось в результате нормализации *)
+         match ce with
+         | Comp_func _ | Comp_tuple _ ->
+             let temp_name = get_new_temp_reg () in
+             let body_anf = norm_comp body k in
+             Anf_let (Nonrecursive, temp_name, ce,
+               Anf_let (rec_flag, x, Comp_imm (Imm_ident temp_name), body_anf))
+
+         | Comp_imm _ | Comp_binop _ | Comp_app _ | Comp_branch _ ->
+             let body_anf = norm_comp body k in
+             Anf_let (rec_flag, x, ce, body_anf)
+       )
      | Pattern.Pat_construct ("()", None) ->
-       norm_comp vb_expr (fun ce ->
+        norm_comp vb_expr (fun ce ->
          let body_anf = norm_comp body k in
          Anf_let (Nonrecursive, "_", ce, body_anf))
      | _ -> failwith ("Unsupported pattern in `let`-binding: " ^ Pattern.show pat))
@@ -130,12 +141,10 @@ and norm_list_to_imm expr_list (k : im_expr list -> anf_expr) : anf_expr =
 
 and norm_body expr = norm_to_imm expr (fun imm -> Anf_comp_expr (Comp_imm imm))
 
-let norm_toplevel expr = norm_comp expr (fun ce -> Anf_comp_expr ce)
-
 let norm_item (item : structure_item) : astructure_item =
   match item with
   | Str_eval expr ->
-    let body_anf = norm_toplevel expr in
+    let body_anf = norm_body expr in
     Anf_str_eval body_anf
   | Str_value (rec_flag, (first_binding, other_bindings)) ->
     if other_bindings <> []
@@ -143,7 +152,7 @@ let norm_item (item : structure_item) : astructure_item =
     let { pat; expr } = first_binding in
     (match pat with
      | Pattern.Pat_var name ->
-       let body_anf = norm_toplevel expr in
+       let body_anf = norm_body expr in
        Anf_str_value (rec_flag, name, body_anf)
      | _ ->
        failwith
