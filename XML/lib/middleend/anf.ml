@@ -37,8 +37,10 @@ type aprogram = astructure_item list [@@deriving eq, show { with_path = false },
 
 let normalise_const = function
   | Const_integer e -> Imm_num e
-  | Const_char e -> Imm_ident (String.make 1 e) (* i guess a standalone immediate type is redundant
-*)
+  | Const_char e ->
+    Imm_ident (String.make 1 e)
+    (* i guess a standalone immediate type is redundant
+    *)
   | Const_string e -> Imm_ident e
 ;;
 
@@ -52,8 +54,7 @@ let get_new_temp_reg =
 
 let rec collect_params_and_body expr acc =
   match expr with
-  | Exp_fun ((Pattern.Pat_var p, []), body) ->
-    collect_params_and_body body (p :: acc)
+  | Exp_fun ((Pattern.Pat_var p, []), body) -> collect_params_and_body body (p :: acc)
   | _ -> List.rev acc, expr
 ;;
 
@@ -65,7 +66,7 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
     let all_exprs = expr1 :: expr2 :: rest_list in
     norm_list_to_imm all_exprs (fun imm_list -> k (Comp_tuple imm_list))
   | Exp_apply (Exp_ident op, Exp_tuple (expr1, expr2, []))
-        when List.mem op [ "+"; "-"; "*"; "="; "<"; ">"; "<="; ">="; "<>" ] ->
+    when List.mem op [ "+"; "-"; "*"; "="; "<"; ">"; "<="; ">="; "<>" ] ->
     norm_to_imm expr1 (fun v1 ->
       norm_to_imm expr2 (fun v2 ->
         let ce =
@@ -93,12 +94,12 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
       let then_anf = norm_body then_ in
       let else_anf = norm_body else_ in
       k (Comp_branch (cond_imm, then_anf, else_anf)))
-| Exp_fun _ ->
+  | Exp_fun _ ->
     let params, body = collect_params_and_body expr [] in
     if params = [] then failwith "Function with no parameters found";
     let body_anf = norm_body body in
     k (Comp_func (params, body_anf))
-| Exp_let (rec_flag, (first_binding, other_bindings), body) ->
+  | Exp_let (rec_flag, (first_binding, other_bindings), body) ->
     if other_bindings <> [] then failwith "`let ... and ...` is not supported in ANF yet";
     let { pat; expr = vb_expr } = first_binding in
     (match pat with
@@ -108,17 +109,18 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
          (* Теперь проверяем, что получилось в результате нормализации *)
          match ce with
          | Comp_func _ | Comp_tuple _ ->
-             let temp_name = get_new_temp_reg () in
-             let body_anf = norm_comp body k in
-             Anf_let (Nonrecursive, temp_name, ce,
-               Anf_let (rec_flag, x, Comp_imm (Imm_ident temp_name), body_anf))
-
+           let temp_name = get_new_temp_reg () in
+           let body_anf = norm_comp body k in
+           Anf_let
+             ( Nonrecursive
+             , temp_name
+             , ce
+             , Anf_let (rec_flag, x, Comp_imm (Imm_ident temp_name), body_anf) )
          | Comp_imm _ | Comp_binop _ | Comp_app _ | Comp_branch _ ->
-             let body_anf = norm_comp body k in
-             Anf_let (rec_flag, x, ce, body_anf)
-       )
+           let body_anf = norm_comp body k in
+           Anf_let (rec_flag, x, ce, body_anf))
      | Pattern.Pat_construct ("()", None) ->
-        norm_comp vb_expr (fun ce ->
+       norm_comp vb_expr (fun ce ->
          let body_anf = norm_comp body k in
          Anf_let (Nonrecursive, "_", ce, body_anf))
      | _ -> failwith ("Unsupported pattern in `let`-binding: " ^ Pattern.show pat))

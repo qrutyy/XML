@@ -40,11 +40,13 @@ module Emission = struct
       emit xori rd rd 1
     | "<>" ->
       let temp = T 2 in
-      emit xor temp r1 r2; (* temp = 0 if r1 == r2, non-zero otherwise *)
-      emit snez rd temp   (* dst = 1 if temp != 0, else 0 *)
+      emit xor temp r1 r2;
+      (* temp = 0 if r1 == r2, non-zero otherwise *)
+      emit snez rd temp (* dst = 1 if temp != 0, else 0 *)
     | _ -> failwith ("Unknown binary operator: " ^ op)
   ;;
-(*миша я переписал через емит чтобы у нас вся оработка шла черз один модуль*)
+
+  (*миша я переписал через емит чтобы у нас вся оработка шла черз один модуль*)
   let emit_prologue name stack_size =
     (* name: *)
     emit label name;
@@ -59,9 +61,12 @@ module Emission = struct
   ;;
 
   let emit_epilogue stack_size =
-    emit addi SP (S 0) (2 * Target.word_size);  (* sp = fp + 2*word *)
-    emit ld  RA (S 0, Target.word_size);        (* ra = [fp+word] *)
-    emit ld  (S 0) (S 0, 0);                    (* fp = [fp+0] *)
+    emit addi SP (S 0) (2 * Target.word_size);
+    (* sp = fp + 2*word *)
+    emit ld RA (S 0, Target.word_size);
+    (* ra = [fp+word] *)
+    emit ld (S 0) (S 0, 0);
+    (* fp = [fp+0] *)
     emit ret
   ;;
 end

@@ -10,6 +10,7 @@ open Machine
 open Emission.Emission
 
 let label_counter = ref 0
+
 (* hold the deferred functions *)
 let deferred_functions : (string * ident list * anf_expr) list ref = ref []
 
@@ -120,39 +121,34 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
     let _ = gen_anf_expr else_state dst else_anf in
     emit label lbl_end;
     state
-| Comp_func (params, body) ->
-      let func_label = fresh_label "lambda" in
-      deferred_functions := (func_label, params, body) :: !deferred_functions;
-      emit la dst func_label; (*load address*)
-      state
-  
+  | Comp_func (params, body) ->
+    let func_label = fresh_label "lambda" in
+    deferred_functions := (func_label, params, body) :: !deferred_functions;
+    emit la dst func_label;
+    (*load address*)
+    state
   | Comp_tuple _ ->
-      (* Tuples would require heap allocation.
+    (* Tuples would require heap allocation.
          The test cases do not involve tuples. *)
-      failwith "Tuple values are not yet implemented"
+    failwith "Tuple values are not yet implemented"
 ;;
 
 (* counts the number of let bindings to allocate space on stack *)
 let rec count_locals_in_anf (aexpr : anf_expr) : int =
   match aexpr with
   | Anf_let (_, _, comp_expr, body) ->
-      let locals_in_comp = count_locals_in_comp comp_expr in
-      let locals_in_body = count_locals_in_anf body in
-      max locals_in_comp (1 + locals_in_body)
-  | Anf_comp_expr comp_expr ->
-      count_locals_in_comp comp_expr
+    let locals_in_comp = count_locals_in_comp comp_expr in
+    let locals_in_body = count_locals_in_anf body in
+    max locals_in_comp (1 + locals_in_body)
+  | Anf_comp_expr comp_expr -> count_locals_in_comp comp_expr
 
 and count_locals_in_comp (cexpr : comp_expr) : int =
   match cexpr with
-  | Comp_imm _
-  | Comp_binop _
-  | Comp_app _
-  | Comp_func _
-  | Comp_tuple _ -> 0
+  | Comp_imm _ | Comp_binop _ | Comp_app _ | Comp_func _ | Comp_tuple _ -> 0
   | Comp_branch (_, then_anf, else_anf) ->
-      let locals_in_then = count_locals_in_anf then_anf in
-      let locals_in_else = count_locals_in_anf else_anf in
-      max locals_in_then locals_in_else
+    let locals_in_then = count_locals_in_anf then_anf in
+    let locals_in_else = count_locals_in_anf else_anf in
+    max locals_in_then locals_in_else
 ;;
 
 let gen_func func_name params body_anf ppf =
@@ -175,8 +171,8 @@ let gen_func func_name params body_anf ppf =
 
 let gen_start ppf =
   fprintf ppf ".section .text\n";
-fprintf ppf ".global main\n";
-    fprintf ppf ".type main, @function\n";
+  fprintf ppf ".global main\n";
+  fprintf ppf ".type main, @function\n"
 ;;
 
 let gen_program ppf (program : aprogram) =
@@ -189,7 +185,7 @@ let gen_program ppf (program : aprogram) =
       program
   in
   if has_main then gen_start ppf;
-List.iter
+  List.iter
     (function
       | Anf_str_eval anf_expr -> gen_func "main" [] anf_expr ppf
       | Anf_str_value (_rec_flag, name, anf_expr) ->
@@ -200,7 +196,7 @@ List.iter
         in
         gen_func name params body ppf)
     program;
- List.iter
+  List.iter
     (fun (name, params, body) -> gen_func name params body ppf)
     (List.rev !deferred_functions);
   flush_queue ppf

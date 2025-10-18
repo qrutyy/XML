@@ -22,7 +22,6 @@ type comp_expr =
 and anf_expr =
   | Anf_comp_expr of comp_expr (* Atomic Computable Expression *)
   | Anf_let of rec_flag * ident * comp_expr * anf_expr (* let x = cexpr in anf_expr *)
-;;
 
 type astructure_item =
   | Anf_str_eval of anf_expr

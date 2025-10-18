@@ -6,13 +6,12 @@ type reg =
   | A of int (*function args*)
   | T of int (*temporary*)
   | S of int (*saved*)
-  | RA 
+  | RA
   | SP
   | Zero
 [@@deriving eq]
 
-type offset = reg * int
-[@@deriving eq]
+type offset = reg * int [@@deriving eq]
 
 let pp_reg ppf =
   let open Format in
@@ -25,36 +24,34 @@ let pp_reg ppf =
   | SP -> fprintf ppf "sp"
 ;;
 
-let pp_offset ppf (reg, off) =
-  Format.fprintf ppf "%d(%a)" off pp_reg reg
+let pp_offset ppf (reg, off) = Format.fprintf ppf "%d(%a)" off pp_reg reg
 
 type instr =
-  | Addi of reg * reg * int    (* ADD immediate *)
-  | Add  of reg * reg * reg    (* ADD *)
-  | Sub  of reg * reg * reg    (* SUB *)
-  | Mul  of reg * reg * reg    (* MUL *)
-  | Slt  of reg * reg * reg    (* SLT: set less than (signed) *)
-  | Seqz of reg * reg          (* SEQZ: set equal zero *)
-  | Snez of reg * reg          (* SNEZ: set not equal zero *)
-  | Xor  of reg * reg * reg    (* XOR *)
-  | Xori of reg * reg * int    (* XOR immediate *)
-  | Beq  of reg * reg * string (* BEQ: branch if equal *)
-  | Blt  of reg * reg * string (* BLT: branch if less than *)
-  | Ble  of reg * reg * string (* BLE: branch if less or equal *)
-  | Lla  of reg * string       (* LLA: load address *)
-  | Li   of reg * int          (* LI: load immediate *)
-  | Ld   of reg * offset       (* LD: load doubleword *)
-  | Sd   of reg * offset       (* SD: store doubleword *)
-  | Mv   of reg * reg          (* MV: move *)
-  | Comment of string          (* Assembler comment *)
-  | Label   of string          (* Assembler label *)
-  | Call of string             (* CALL *)
-  | J    of string             (* J: jump *)
-  | Ecall                      (* ECALL *)
-  | Ret                        (* return *)
-  | La of reg * string         (* Load Address of labeled function into the reg *)
+  | Addi of reg * reg * int (* ADD immediate *)
+  | Add of reg * reg * reg (* ADD *)
+  | Sub of reg * reg * reg (* SUB *)
+  | Mul of reg * reg * reg (* MUL *)
+  | Slt of reg * reg * reg (* SLT: set less than (signed) *)
+  | Seqz of reg * reg (* SEQZ: set equal zero *)
+  | Snez of reg * reg (* SNEZ: set not equal zero *)
+  | Xor of reg * reg * reg (* XOR *)
+  | Xori of reg * reg * int (* XOR immediate *)
+  | Beq of reg * reg * string (* BEQ: branch if equal *)
+  | Blt of reg * reg * string (* BLT: branch if less than *)
+  | Ble of reg * reg * string (* BLE: branch if less or equal *)
+  | Lla of reg * string (* LLA: load address *)
+  | Li of reg * int (* LI: load immediate *)
+  | Ld of reg * offset (* LD: load doubleword *)
+  | Sd of reg * offset (* SD: store doubleword *)
+  | Mv of reg * reg (* MV: move *)
+  | Comment of string (* Assembler comment *)
+  | Label of string (* Assembler label *)
+  | Call of string (* CALL *)
+  | J of string (* J: jump *)
+  | Ecall (* ECALL *)
+  | Ret (* return *)
+  | La of reg * string (* Load Address of labeled function into the reg *)
 [@@deriving eq]
-
 
 let pp_instr ppf =
   let open Format in

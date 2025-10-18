@@ -3,7 +3,6 @@
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 open Format
-open Common.Ast
 
 (* gens program on riscv asm from the ast *)
 val gen_program : formatter -> Middleend.Anf.aprogram -> unit
