@@ -104,9 +104,8 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
     let { pat; expr = vb_expr } = first_binding in
     (match pat with
      | Pattern.Pat_var x ->
-       norm_comp vb_expr (fun ce ->
-         match ce with
-         | Comp_func _ | Comp_tuple _ ->
+       norm_comp vb_expr (function         
+                    | (Comp_func _ | Comp_tuple _) as ce ->
            let temp_name = get_new_temp_reg () in
            let body_anf = norm_comp body k in
            Anf_let
@@ -114,7 +113,7 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
              , temp_name
              , ce
              , Anf_let (rec_flag, x, Comp_imm (Imm_ident temp_name), body_anf) )
-         | Comp_imm _ | Comp_binop _ | Comp_app _ | Comp_branch _ ->
+         | (Comp_imm _ | Comp_binop _ | Comp_app _ | Comp_branch _) as ce ->
            let body_anf = norm_comp body k in
            Anf_let (rec_flag, x, ce, body_anf))
      | Pattern.Pat_construct ("()", None) ->
