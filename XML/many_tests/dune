@@ -16,7 +16,4 @@
 
 (cram
  (applies_to codegen anf)
- (deps
-  ../bin/XML.exe
-  ../bin/runtime.c))
-
+ (deps ../bin/XML.exe ../bin/runtime.c))

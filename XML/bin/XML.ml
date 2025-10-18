@@ -12,6 +12,7 @@ type options =
   { mutable input_file_name : string option
   ; mutable output_file_name : string option
   ; mutable show_ast : bool
+  ; mutable show_anf : bool
   }
 
 (* ------------------------------- *)
@@ -28,24 +29,28 @@ let to_asm ast : string =
 ;;
 
 let compile_and_write options source_code =
-    let ast = Common.Parser.parse_str source_code in
-
-      if options.show_ast
-      then (
-        printf "%a\n" Common.Pprinter.pprint_program ast;
-        exit 0);
-      let asm_code = to_asm ast in
-      match options.output_file_name with
-      | Some out_file ->
-        (try
-           let oc = open_out out_file in
-           output_string oc asm_code;
-           close_out oc
-         with
-         | Sys_error msg ->
-           eprintf "Error: Could not write to output file '%s': %s\n" out_file msg;
-           exit 1)
-      | None -> print_string asm_code
+  let ast = Common.Parser.parse_str source_code in
+  if options.show_ast
+  then (
+    printf "%a\n" Common.Pprinter.pprint_program ast;
+    exit 0);
+  let anf_ast = Middleend.Anf.anf_program ast in
+  if options.show_anf
+  then (
+    Middleend.Pprinter.print_anf_program std_formatter anf_ast;
+    exit 0);
+  let asm_code = to_asm ast in
+  match options.output_file_name with
+  | Some out_file ->
+    (try
+       let oc = open_out out_file in
+       output_string oc asm_code;
+       close_out oc
+     with
+     | Sys_error msg ->
+       eprintf "Error: Could not write to output file '%s': %s\n" out_file msg;
+       exit 1)
+  | None -> print_string asm_code
 ;;
 
 let read_channel_to_string ic =
@@ -64,8 +69,13 @@ let read_channel_to_string ic =
 (* ------------------------------- *)
 
 let () =
-  let options = { input_file_name = None; output_file_name = None; show_ast = false } in
-  
+  let options =
+    { input_file_name = None
+    ; output_file_name = None
+    ; show_ast = false
+    ; show_anf = false
+    }
+  in
   let usage_msg =
     "MiniML Compiler\n\n"
     ^ "Usage: dune exec ./bin/compile.exe -- <options> [input_file.ml]\n"
@@ -79,6 +89,9 @@ let () =
     ; ( "--ast"
       , Arg.Unit (fun () -> options.show_ast <- true)
       , "         Show the parsed Abstract Syntax Tree and exit" )
+    ; ( "--anf"
+      , Arg.Unit (fun () -> options.show_anf <- true)
+      , "         Show the ANF representation and exit" )
     ]
   in
   let handle_anon_arg filename =
@@ -90,7 +103,6 @@ let () =
       exit 1
   in
   Arg.parse arg_specs handle_anon_arg usage_msg;
-
   let source_code =
     match options.input_file_name with
     | Some path ->
@@ -103,9 +115,7 @@ let () =
        | Sys_error msg ->
          eprintf "Error: Could not read input file: %s\n" msg;
          exit 1)
-    | None ->
-      read_channel_to_string stdin
+    | None -> read_channel_to_string stdin
   in
-  
   compile_and_write options source_code
 ;;
