@@ -55,13 +55,9 @@ module Emission = struct
   ;;
 
   let emit_epilogue stack_size =
-    (* ld ra, word(fp) *)
-    emit ld RA (S 0, Target.word_size);
-    (* ld fp, 0(fp) *)
-    emit ld (S 0) (S 0, 0);
-    (* addi sp, sp, stack_size *)
-    emit addi SP SP stack_size;
-    (* ret *)
+    emit addi SP (S 0) (2 * Target.word_size);  (* sp = fp + 2*word *)
+    emit ld  RA (S 0, Target.word_size);        (* ra = [fp+word] *)
+    emit ld  (S 0) (S 0, 0);                    (* fp = [fp+0] *)
     emit ret
   ;;
 end
