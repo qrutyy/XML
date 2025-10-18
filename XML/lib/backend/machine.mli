@@ -39,6 +39,7 @@ type instr =
   | J    of string             (* J: jump *)
   | Ecall                      (* ECALL *)
   | Ret                        (* return *)
+  | La of reg * string         (* Load Address of labeled function into the reg *)
 
 val pp_instr : Format.formatter -> instr -> unit
 val addi : (instr -> 'a) -> reg -> reg -> int -> 'a
@@ -62,5 +63,6 @@ val beq : (instr -> 'a) -> reg -> reg -> string -> 'a
 val blt : (instr -> 'a) -> reg -> reg -> string -> 'a
 val ble : (instr -> 'a) -> reg -> reg -> string -> 'a
 val j : (instr -> 'a) -> string -> 'a
+val la : (instr -> 'a) -> reg -> string -> 'a
 val comment : (instr -> 'a) -> string -> 'a
 val label : (instr -> 'a) -> string -> 'a

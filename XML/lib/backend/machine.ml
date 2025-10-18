@@ -52,6 +52,7 @@ type instr =
   | J    of string             (* J: jump *)
   | Ecall                      (* ECALL *)
   | Ret                        (* return *)
+  | La of reg * string         (* Load Address of labeled function into the reg *)
 [@@deriving eq]
 
 
@@ -78,6 +79,7 @@ let pp_instr ppf =
   | Beq (r1, r2, s) -> fprintf ppf "beq %a, %a, %s" pp_reg r1 pp_reg r2 s
   | Blt (r1, r2, s) -> fprintf ppf "blt %a, %a, %s" pp_reg r1 pp_reg r2 s
   | Ble (r1, r2, s) -> fprintf ppf "ble %a, %a, %s" pp_reg r1 pp_reg r2 s
+  | La (r, label) -> fprintf ppf "la %a, %s" pp_reg r label
   | J s -> fprintf ppf "j %s" s
   | Label s -> fprintf ppf "%s:" s
   | Comment s -> fprintf ppf " # %s" s
@@ -104,5 +106,6 @@ let ble k r1 r2 r3 = k @@ Ble (r1, r2, r3)
 let seqz k rd r1 = k (Seqz (rd, r1))
 let snez k rd r1 = k (Snez (rd, r1))
 let j k s = k @@ J s
+let la k r label = k (La (r, label))
 let comment k s = k (Comment s)
 let label k s = k (Label s)
