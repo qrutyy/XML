@@ -13,3 +13,10 @@
  (instrumentation
   (backend bisect_ppx))
  (inline_tests))
+
+(cram
+ (applies_to codegen anf)
+ (deps
+  ../bin/XML.exe
+  ../bin/runtime.c))
+
