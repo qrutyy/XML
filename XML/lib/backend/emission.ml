@@ -2,8 +2,8 @@
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
+open Base.Format
 open Base
-open Format
 open Machine
 open Target
 
