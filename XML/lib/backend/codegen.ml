@@ -123,12 +123,21 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
 ;;
 
 (* counts the number of let bindings to allocate space on stack *)
-let rec count_locals_in_anf (aexpr : anf_expr) =
-  match aexpr with
-  | Anf_let (_, _, _, body) -> 1 + count_locals_in_anf body
-  | Anf_comp_expr (Comp_branch (_, then_e, else_e)) ->
-    max (count_locals_in_anf then_e) (count_locals_in_anf else_e)
-  | _ -> 0
+let count_locals_in_anf (aexpr : anf_expr) =
+  let rec count_rec current_depth max_seen aexpr =
+    match aexpr with
+    | Anf_let (_, _, _, body) ->
+      (* for a let binding, increment current depth and recurse *)
+      count_rec (current_depth + 1) max_seen body
+    | Anf_comp_expr (Comp_branch (_, then_e, else_e)) ->
+      let max_after_then = count_rec current_depth max_seen then_e in
+      let max_after_else = count_rec current_depth max_seen else_e in
+      max max_after_then max_after_else
+    | Anf_comp_expr _ ->
+      (* at the end of a chain, update the max depth seen so far *)
+      max current_depth max_seen
+  in
+  count_rec 0 0 aexpr
 ;;
 
 let gen_func func_name params body_anf ppf =
