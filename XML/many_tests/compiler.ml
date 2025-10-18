@@ -487,7 +487,7 @@ let main =
 ;;" in
   let asm = to_asm ast_factorial in
   print_endline asm;
-  [%expect{|
+  [%expect {|
     .text
     .global _start
     _start:
@@ -500,10 +500,10 @@ let main =
       addi sp, sp, 64
       ret
     fac:
-      addi sp, sp, -32
-      sd ra, 24(sp)
-      sd s0, 16(sp)
-      addi s0, sp, 16
+      addi sp, sp, -48
+      sd ra, 40(sp)
+      sd s0, 32(sp)
+      addi s0, sp, 32
       mv t0, a0
       li t1, 1
       slt t0, t1, t0
@@ -536,7 +536,7 @@ let main =
       ld a0, -16(s0)
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 32
+      addi sp, sp, 48
       ret
     main:
       addi sp, sp, -32
@@ -555,7 +555,8 @@ let main =
       ld ra, 8(s0)
       ld s0, 0(s0)
       addi sp, sp, 32
-      ret |}]
+      ret
+    |}]
 
 
 let%expect_test "simple let" =
@@ -567,23 +568,23 @@ let%expect_test "simple let" =
   (* CR expect_test_collector: This test expectation appears to contain a backtrace.
      This is strongly discouraged as backtraces are fragile.
      Please change this test to not include a backtrace. *)
-
   (Failure ": end_of_input")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 99, characters 22-41
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 103, characters 22-41
+  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 142, characters 10-28
+  |}]
 
 let%expect_test "factorial_basic_codegen" =
   let ast_factorial = parse_str "let rec fac n = if n <= 1 then 1 else n * fac (n - 1)
 ;;" in
   let asm = to_asm ast_factorial in
   print_endline asm;
-  [%expect{|
+  [%expect {|
     fac:
-      addi sp, sp, -32
-      sd ra, 24(sp)
-      sd s0, 16(sp)
-      addi s0, sp, 16
+      addi sp, sp, -48
+      sd ra, 40(sp)
+      sd s0, 32(sp)
+      addi s0, sp, 32
       mv t0, a0
       li t1, 1
       slt t0, t1, t0
@@ -616,12 +617,21 @@ let%expect_test "factorial_basic_codegen" =
       ld a0, -16(s0)
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 32
-      ret |}]
+      addi sp, sp, 48
+      ret
+    |}]
 
 
-let%expect_test "fibonacci" =
-  let ast_factorial = parse_str "let rec fib n = if n == 0 then 0 else n + fib(n - 1);;" in
+let%expect_test "ifs" =
+  let ast_factorial = parse_str "
+  let large x = if 0<>x then print_int 0 else print_int 1
+  let main =
+  let x = if (if (if 0
+  then 0 else (let t42 = print_int 42 in 1))
+  then 0 else 1)
+  then 0 else 1 in
+  large x
+  ;;" in
   let asm = to_asm ast_factorial in
   print_endline asm;
   [%expect.unreachable]
@@ -629,22 +639,69 @@ let%expect_test "fibonacci" =
   (* CR expect_test_collector: This test expectation appears to contain a backtrace.
      This is strongly discouraged as backtraces are fragile.
      Please change this test to not include a backtrace. *)
-
-  (Failure ": end_of_input")
+  (Failure
+    "Function/Tuple values should be handled at the top level or via let-bindings")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 160, characters 22-88
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  Called from Backend__Codegen.gen_anf_expr in file "lib/backend/codegen.ml", line 51, characters 28-63
+  Called from Backend__Codegen.gen_func in file "lib/backend/codegen.ml", line 175, characters 21-62
+  Called from Stdlib__List.iter in file "list.ml", line 112, characters 12-15
+  Called from Backend__Codegen.gen_program in file "lib/backend/codegen.ml", lines 200-210, characters 0-11
+  Called from XML_manytests__Compiler.to_asm in file "many_tests/compiler.ml", line 19, characters 2-41
+  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 175, characters 12-32
+  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 142, characters 10-28
+  |}]
 
-let%expect_test "fib" =
-  let ast_factorial = parse_str "let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2);;" in
+let%expect_test "ifs" =
+  let ast_factorial = parse_str "
+  let large x = if 0<>x then print_int 0 else print_int 1
+  let main =
+  let x = if (if (if 0
+  then 0 else (let t42 = print_int 42 in 1))
+  then 0 else 1)
+  then 0 else 1 in
+  large x
+  ;;" in
   let asm = to_asm ast_factorial in
   print_endline asm;
-  [%expect{|
+  [%expect.unreachable]
+[@@expect.uncaught_exn {|
+  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
+     This is strongly discouraged as backtraces are fragile.
+     Please change this test to not include a backtrace. *)
+  (Failure
+    "Function/Tuple values should be handled at the top level or via let-bindings")
+  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
+  Called from Backend__Codegen.gen_anf_expr in file "lib/backend/codegen.ml", line 51, characters 28-63
+  Called from Backend__Codegen.gen_func in file "lib/backend/codegen.ml", line 175, characters 21-62
+  Called from Stdlib__List.iter in file "list.ml", line 112, characters 12-15
+  Called from Backend__Codegen.gen_program in file "lib/backend/codegen.ml", lines 200-210, characters 0-11
+  Called from XML_manytests__Compiler.to_asm in file "many_tests/compiler.ml", line 19, characters 2-41
+  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 204, characters 12-32
+  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 142, characters 10-28
+  |}]
+
+let%expect_test "fib" =
+  let ast_factorial = parse_str "let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2)
+
+let main =
+  let () = print_int (fib 2) in
+  0
+  ;;" in
+  let asm = to_asm ast_factorial in
+  print_endline asm;
+  [%expect {|
+    .text
+    .global _start
+    _start:
+      call main
+      li a7, 93
+      ecall
+
     fib:
-      addi sp, sp, -32
-      sd ra, 24(sp)
-      sd s0, 16(sp)
-      addi s0, sp, 16
+      addi sp, sp, -64
+      sd ra, 56(sp)
+      sd s0, 48(sp)
+      addi s0, sp, 48
       mv t0, a0
       li t1, 1
       slt t0, t1, t0
@@ -689,5 +746,24 @@ let%expect_test "fib" =
       ld a0, -16(s0)
       ld ra, 8(s0)
       ld s0, 0(s0)
+      addi sp, sp, 64
+      ret
+    main:
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      li a0, 2
+      call fib
+      mv t0, a0
+      sd t0, -8(s0)
+      ld a0, -8(s0)
+      call print_int
+      mv t0, a0
+      sd t0, -16(s0)
+      li a0, 0
+      ld ra, 8(s0)
+      ld s0, 0(s0)
       addi sp, sp, 32
-      ret |}]
+      ret
+    |}]

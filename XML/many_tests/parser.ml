@@ -102,3 +102,64 @@ let main =
       |}]
 ;;
 
+let%expect_test "ifs" =
+    test_program {|
+  let large x = if 0<>x then print_int 0 else print_int 1
+  let main =
+  let x = if (if (if 0
+  then 0 else (let t42 = print_int 42 in 1))
+  then 0 else 1)
+  then 0 else 1 in
+  large x
+        ;; |};
+  [%expect {|
+    [(Str_value (Nonrecursive,
+        ({ pat = (Pat_var "large");
+           expr =
+           (Exp_fun (((Pat_var "x"), []),
+              (Exp_if (
+                 (Exp_apply ((Exp_ident "<>"),
+                    (Exp_tuple
+                       ((Exp_constant (Const_integer 0)), (Exp_ident "x"), []))
+                    )),
+                 (Exp_apply ((Exp_ident "print_int"),
+                    (Exp_constant (Const_integer 0)))),
+                 (Some (Exp_apply ((Exp_ident "print_int"),
+                          (Exp_constant (Const_integer 1)))))
+                 ))
+              ))
+           },
+         [])
+        ));
+      (Str_value (Nonrecursive,
+         ({ pat = (Pat_var "main");
+            expr =
+            (Exp_let (Nonrecursive,
+               ({ pat = (Pat_var "x");
+                  expr =
+                  (Exp_if (
+                     (Exp_if (
+                        (Exp_if ((Exp_constant (Const_integer 0)),
+                           (Exp_constant (Const_integer 0)),
+                           (Some (Exp_let (Nonrecursive,
+                                    ({ pat = (Pat_var "t42");
+                                       expr =
+                                       (Exp_apply ((Exp_ident "print_int"),
+                                          (Exp_constant (Const_integer 42))))
+                                       },
+                                     []),
+                                    (Exp_constant (Const_integer 1)))))
+                           )),
+                        (Exp_constant (Const_integer 0)),
+                        (Some (Exp_constant (Const_integer 1))))),
+                     (Exp_constant (Const_integer 0)),
+                     (Some (Exp_constant (Const_integer 1)))))
+                  },
+                []),
+               (Exp_apply ((Exp_ident "large"), (Exp_ident "x")))))
+            },
+          [])
+         ))
+      ]
+    |}]
+

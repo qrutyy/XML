@@ -119,25 +119,30 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
     emit label lbl_end;
     state
   | Comp_func _ | Comp_tuple _ ->
-    failwith "Function/Tuple values should be handled at the top level"
+    failwith "Function/Tuple values should be handled at the top level or via let-bindings"
 ;;
 
 (* counts the number of let bindings to allocate space on stack *)
-let count_locals_in_anf (aexpr : anf_expr) =
-  let rec count_rec current_depth max_seen aexpr =
-    match aexpr with
-    | Anf_let (_, _, _, body) ->
-      (* for a let binding, increment current depth and recurse *)
-      count_rec (current_depth + 1) max_seen body
-    | Anf_comp_expr (Comp_branch (_, then_e, else_e)) ->
-      let max_after_then = count_rec current_depth max_seen then_e in
-      let max_after_else = count_rec current_depth max_seen else_e in
-      max max_after_then max_after_else
-    | Anf_comp_expr _ ->
-      (* at the end of a chain, update the max depth seen so far *)
-      max current_depth max_seen
-  in
-  count_rec 0 0 aexpr
+let rec count_locals_in_anf (aexpr : anf_expr) : int =
+  match aexpr with
+  | Anf_let (_, _, comp_expr, body) ->
+      let locals_in_comp = count_locals_in_comp comp_expr in
+      let locals_in_body = count_locals_in_anf body in
+      max locals_in_comp (1 + locals_in_body)
+  | Anf_comp_expr comp_expr ->
+      count_locals_in_comp comp_expr
+
+and count_locals_in_comp (cexpr : comp_expr) : int =
+  match cexpr with
+  | Comp_imm _
+  | Comp_binop _
+  | Comp_app _
+  | Comp_func _
+  | Comp_tuple _ -> 0
+  | Comp_branch (_, then_anf, else_anf) ->
+      let locals_in_then = count_locals_in_anf then_anf in
+      let locals_in_else = count_locals_in_anf else_anf in
+      max locals_in_then locals_in_else
 ;;
 
 let gen_func func_name params body_anf ppf =
@@ -174,17 +179,15 @@ let gen_program ppf (program : aprogram) =
       program
   in
   if has_main then gen_start ppf;
-  List.iter
+List.iter
     (function
       | Anf_str_eval anf_expr -> gen_func "main" [] anf_expr ppf
       | Anf_str_value (_rec_flag, name, anf_expr) ->
-        let rec extract_params_and_body acc aexpr =
-          match aexpr with
-          | Anf_comp_expr (Comp_func (param, body)) ->
-            extract_params_and_body (param :: acc) body
-          | _ -> List.rev acc, aexpr
+        let params, body =
+          match anf_expr with
+          | Anf_comp_expr (Comp_func (ps, body)) -> ps, body
+          | _ -> [], anf_expr
         in
-        let params, body = extract_params_and_body [] anf_expr in
         gen_func name params body ppf)
     program;
   flush_queue ppf

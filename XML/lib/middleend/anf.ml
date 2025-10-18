@@ -19,7 +19,7 @@ type comp_expr =
   | Comp_binop of ident * im_expr * im_expr (* x + y *)
   | Comp_app of im_expr * im_expr list (* f(x, y) *)
   | Comp_branch of im_expr * anf_expr * anf_expr (* if c then ... else ... *)
-  | Comp_func of ident * anf_expr (* fun x -> ... *)
+  | Comp_func of ident list * anf_expr (* fun x y ... -> ... *)
   | Comp_tuple of im_expr list
 [@@deriving eq, show { with_path = false }, qcheck]
 
@@ -48,6 +48,13 @@ let get_new_temp_reg =
     let name = "t_" ^ string_of_int !counter in
     counter := !counter + 1;
     name
+;;
+
+let rec collect_params_and_body expr acc =
+  match expr with
+  | Exp_fun ((Pattern.Pat_var p, []), body) ->
+    collect_params_and_body body (p :: acc)
+  | _ -> List.rev acc, expr
 ;;
 
 let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
@@ -86,9 +93,11 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
       let then_anf = norm_body then_ in
       let else_anf = norm_body else_ in
       k (Comp_branch (cond_imm, then_anf, else_anf)))
-  | Exp_fun ((Pattern.Pat_var x, []), body) ->
+| Exp_fun _ ->
+    let params, body = collect_params_and_body expr [] in
+    if params = [] then failwith "Function with no parameters found";
     let body_anf = norm_body body in
-    k (Comp_func (x, body_anf))
+    k (Comp_func (params, body_anf))
   | Exp_let (rec_flag, (first_binding, other_bindings), body) ->
     if other_bindings <> [] then failwith "`let ... and ...` is not supported in ANF yet";
     let { pat; expr = vb_expr } = first_binding in

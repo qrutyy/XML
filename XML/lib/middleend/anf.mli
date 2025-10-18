@@ -16,7 +16,7 @@ type comp_expr =
   | Comp_binop of ident * im_expr * im_expr (* x + y *)
   | Comp_app of im_expr * im_expr list (* f(x, y) *)
   | Comp_branch of im_expr * anf_expr * anf_expr (* if c then ... else ... *)
-  | Comp_func of ident * anf_expr (* fun x -> ... *)
+  | Comp_func of ident list * anf_expr (* fun x -> ... *)
   | Comp_tuple of im_expr list
 
 and anf_expr =
