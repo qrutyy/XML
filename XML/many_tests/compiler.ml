@@ -7,12 +7,19 @@ open Common.Parser
 open Format
 
 let to_asm ast =
+  (* `ast` здесь - это "сырой" AST (тип: Structure.structure_item list) *)
+
+  (* 2. Трансформируем "сырой" AST в ANF AST *)
+  let anf_ast = Middleend.Anf.anf_program ast in
+
   let buf = Buffer.create 1024 in
   let ppf = formatter_of_buffer buf in
-  Backend.Codegen.gen_program ppf ast;
+
+  (* 3. Передаем в кодогенератор уже ANF-представление *)
+  Backend.Codegen.gen_program ppf anf_ast;
+
   pp_print_flush ppf ();
   Buffer.contents buf
-
 
 (*--- аст для арифметичских операций*)
 let%expect_test "add_codegen" =
@@ -469,7 +476,6 @@ let main =
     |}]
 ;;
 
-
 (* --- AST для factorial + main --- *)
 
 let%expect_test "factorial_codegen" =
@@ -481,7 +487,8 @@ let main =
 ;;" in
   let asm = to_asm ast_factorial in
   print_endline asm;
-  [%expect {|
+  [%expect{|
+    .text
     .global _start
     _start:
       call main
@@ -493,44 +500,62 @@ let main =
       addi sp, sp, 64
       ret
     fac:
-      addi sp, sp, -48
-      sd ra, 40(sp)
-      sd s0, 32(sp)
-      addi s0, sp, 32
-      mv t2, t0
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      mv t0, a0
       li t1, 1
-      slt t0, t1, t2
+      slt t0, t1, t0
       xori t0, t0, 1
+      sd t0, -8(s0)
+      ld t0, -8(s0)
       beq t0, zero, else_0
-      li a0, 1
-      j end_1
+      li t0, 1
+      j endif_1
     else_0:
-      mv t2, t0
-      mv t2, t0
+      mv t0, a0
       li t1, 1
-      sub t0, t2, t1
-      mv a0, t0
+      sub t0, t0, t1
+      sd t0, -16(s0)
+      addi sp, sp, -8
+      sd a0, 0(sp)
+      ld a0, -16(s0)
       call fac
-      mv t1, a0
-      mul a0, t2, t1
-    end_1:
+      mv t0, a0
+      ld a0, 0(sp)
+      addi sp, sp, 8
+      sd t0, -24(s0)
+      mv t0, a0
+      ld t1, -24(s0)
+      mul t0, t0, t1
+      sd t0, -32(s0)
+      ld t0, -32(s0)
+    endif_1:
+      sd t0, -16(s0)
+      ld a0, -16(s0)
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 48
+      addi sp, sp, 32
       ret
     main:
       addi sp, sp, -32
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li t0, 2
-      mv a0, t0
+      li a0, 2
       call fac
       mv t0, a0
-      mv a0, t0
+      sd t0, -8(s0)
+      ld a0, -8(s0)
       call print_int
+      mv t0, a0
+      sd t0, -16(s0)
       li a0, 0
-    |}]
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      addi sp, sp, 32
+      ret |}]
 
 
 let%expect_test "simple let" =
@@ -545,7 +570,7 @@ let%expect_test "simple let" =
 
   (Failure ": end_of_input")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 532, characters 22-41
+  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 99, characters 22-41
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 let%expect_test "factorial_basic_codegen" =
@@ -553,34 +578,46 @@ let%expect_test "factorial_basic_codegen" =
 ;;" in
   let asm = to_asm ast_factorial in
   print_endline asm;
-  [%expect {|
+  [%expect{|
+    fac:
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      mv t0, a0
+      li t1, 1
+      slt t0, t1, t0
+      xori t0, t0, 1
+      sd t0, -8(s0)
+      ld t0, -8(s0)
+      beq t0, zero, else_0
+      li t0, 1
+      j endif_1
+    else_0:
+      mv t0, a0
+      li t1, 1
+      sub t0, t0, t1
+      sd t0, -16(s0)
+      addi sp, sp, -8
+      sd a0, 0(sp)
+      ld a0, -16(s0)
+      call fac
+      mv t0, a0
+      ld a0, 0(sp)
+      addi sp, sp, 8
+      sd t0, -24(s0)
+      mv t0, a0
+      ld t1, -24(s0)
+      mul t0, t0, t1
+      sd t0, -32(s0)
+      ld t0, -32(s0)
+    endif_1:
+      sd t0, -16(s0)
+      ld a0, -16(s0)
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
-      ret
-    fac:
-      addi sp, sp, -48
-      sd ra, 40(sp)
-      sd s0, 32(sp)
-      addi s0, sp, 32
-      mv t2, t0
-      li t1, 1
-      slt t0, t1, t2
-      xori t0, t0, 1
-      beq t0, zero, else_0
-      li a0, 1
-      j end_1
-    else_0:
-      mv t2, t0
-      mv t2, t0
-      li t1, 1
-      sub t0, t2, t1
-      mv a0, t0
-      call fac
-      mv t1, a0
-      mul a0, t2, t1
-    end_1:
-    |}]
+      addi sp, sp, 32
+      ret |}]
 
 
 let%expect_test "fibonacci" =
@@ -595,44 +632,62 @@ let%expect_test "fibonacci" =
 
   (Failure ": end_of_input")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 129, characters 22-88
+  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 160, characters 22-88
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 let%expect_test "fib" =
   let ast_factorial = parse_str "let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2);;" in
   let asm = to_asm ast_factorial in
   print_endline asm;
-  [%expect {|
-      ld ra, 8(s0)
-      ld s0, 0(s0)
-      addi sp, sp, 48
-      ret
+  [%expect{|
     fib:
-      addi sp, sp, -48
-      sd ra, 40(sp)
-      sd s0, 32(sp)
-      addi s0, sp, 32
-      mv t2, t0
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      mv t0, a0
       li t1, 1
-      slt t0, t1, t2
+      slt t0, t1, t0
       xori t0, t0, 1
+      sd t0, -8(s0)
+      ld t0, -8(s0)
       beq t0, zero, else_0
-      mv a0, a0
-      j end_1
+      mv t0, a0
+      j endif_1
     else_0:
-      mv t2, t0
+      mv t0, a0
       li t1, 1
-      sub t0, t2, t1
-      mv a0, t0
+      sub t0, t0, t1
+      sd t0, -16(s0)
+      addi sp, sp, -8
+      sd a0, 0(sp)
+      ld a0, -16(s0)
       call fib
       mv t0, a0
-      mv t2, t0
-      mv t2, t0
+      ld a0, 0(sp)
+      addi sp, sp, 8
+      sd t0, -24(s0)
+      mv t0, a0
       li t1, 2
-      sub t0, t2, t1
-      mv a0, t0
+      sub t0, t0, t1
+      sd t0, -32(s0)
+      addi sp, sp, -8
+      sd a0, 0(sp)
+      ld a0, -32(s0)
       call fib
-      mv t1, a0
-      add a0, t2, t1
-    end_1:
-    |}]
+      mv t0, a0
+      ld a0, 0(sp)
+      addi sp, sp, 8
+      sd t0, -40(s0)
+      ld t0, -24(s0)
+      ld t1, -40(s0)
+      add t0, t0, t1
+      sd t0, -48(s0)
+      ld t0, -48(s0)
+    endif_1:
+      sd t0, -16(s0)
+      ld a0, -16(s0)
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      addi sp, sp, 32
+      ret |}]
