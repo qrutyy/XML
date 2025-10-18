@@ -6,17 +6,10 @@ open Common.Parser
 open Format
 
 let to_asm ast =
-  (* `ast` здесь - это "сырой" AST (тип: Structure.structure_item list) *)
-
-  (* 2. Трансформируем "сырой" AST в ANF AST *)
   let anf_ast = Middleend.Anf.anf_program ast in
-
   let buf = Buffer.create 1024 in
   let ppf = formatter_of_buffer buf in
-
-  (* 3. Передаем в кодогенератор уже ANF-представление *)
   Backend.Codegen.gen_program ppf anf_ast;
-
   pp_print_flush ppf ();
   Buffer.contents buf
 
@@ -556,22 +549,6 @@ let main =
       ld s0, 0(s0)
       ret
     |}]
-
-
-let%expect_test "simple let" =
-  let ast_factorial = parse_str "let x;;" in
-  let asm = to_asm ast_factorial in
-  print_endline asm;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-  (Failure ": end_of_input")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 562, characters 22-41
-  Called from Ppx_expect_runtime__Test_block.Configured.dump_backtrace in file "runtime/test_block.ml", line 142, characters 10-28
-  |}]
 
 let%expect_test "factorial_basic_codegen" =
   let ast_factorial = parse_str "let rec fac n = if n <= 1 then 1 else n * fac (n - 1)

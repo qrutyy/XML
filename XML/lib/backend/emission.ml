@@ -47,6 +47,7 @@ module Emission = struct
   ;;
 
   (*миша я переписал через емит чтобы у нас вся оработка шла черз один модуль*)
+  (*re: horosho ;)*)
   let emit_prologue name stack_size =
     (* name: *)
     emit label name;
@@ -61,6 +62,8 @@ module Emission = struct
   ;;
 
   let emit_epilogue stack_size =
+    ignore stack_size;
+    (* should be used in future *)
     emit addi SP (S 0) (2 * Target.word_size);
     (* sp = fp + 2*word *)
     emit ld RA (S 0, Target.word_size);

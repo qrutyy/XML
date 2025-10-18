@@ -104,9 +104,7 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
     let { pat; expr = vb_expr } = first_binding in
     (match pat with
      | Pattern.Pat_var x ->
-       (* Нормализуем правую часть let-связывания *)
        norm_comp vb_expr (fun ce ->
-         (* Теперь проверяем, что получилось в результате нормализации *)
          match ce with
          | Comp_func _ | Comp_tuple _ ->
            let temp_name = get_new_temp_reg () in
