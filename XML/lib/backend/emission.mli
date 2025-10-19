@@ -11,6 +11,7 @@ module Emission : sig
   val emit : ?comm:string -> ((Machine.instr -> unit) -> 'a) -> 'a
   val flush_queue : Format.formatter -> unit
   val emit_bin_op : string -> Machine.reg -> Machine.reg -> Machine.reg -> unit
+  val spill_with_frame : ?comm:string -> Machine.reg -> loc State.State.t
 
   val emit_save_caller_regs
     :  (string, loc) Base.Hashtbl.t

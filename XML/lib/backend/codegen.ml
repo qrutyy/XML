@@ -65,9 +65,15 @@ let rec gen_exp env dst expr ppf : Env.t State.t =
        (match arg with
         | Expression.Exp_tuple (a1, a2, []) ->
           let* env = gen_exp env (T 0) a1 ppf in
-          Emission.emit mv (S 1) (T 0);
+          let* lhs_loc = Emission.spill_with_frame (T 0) ~comm:"binop: spill LHS" in
+          let lhs_ofs =
+            match lhs_loc with
+            | Stack (_, ofs) -> ofs
+            | _ -> failwith "spill_with_frame must return Stack"
+          in
           let* env = gen_exp env (T 1) a2 ppf in
-          Emission.emit_bin_op op dst (S 1) (T 1);
+          Emission.emit ld (T 2) (S 0, lhs_ofs);
+          Emission.emit_bin_op op dst (T 2) (T 1);
           return env
         | _ -> failwith "binary operator expects 2-tuple")
      | Expression.Exp_ident fname ->
