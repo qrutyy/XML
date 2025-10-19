@@ -65,9 +65,9 @@ let rec gen_exp env dst expr ppf : Env.t State.t =
        (match arg with
         | Expression.Exp_tuple (a1, a2, []) ->
           let* env = gen_exp env (T 0) a1 ppf in
-          Emission.emit mv (T 2) (T 0);
+          Emission.emit mv (S 1) (T 0);
           let* env = gen_exp env (T 1) a2 ppf in
-          Emission.emit_bin_op op dst (T 2) (T 1);
+          Emission.emit_bin_op op dst (S 1) (T 1);
           return env
         | _ -> failwith "binary operator expects 2-tuple")
      | Expression.Exp_ident fname ->
@@ -94,10 +94,8 @@ let rec gen_exp env dst expr ppf : Env.t State.t =
     let lbl_else = State.fresh_label "else_" in
     let lbl_end = State.fresh_label "end_" in
     Emission.emit beq (T 0) Zero lbl_else;
-
     let* env = gen_exp env dst then_e ppf in
     Emission.emit j lbl_end;
-    
     Emission.emit label lbl_else;
     let* env = gen_exp env dst else_e ppf in
     Emission.emit label lbl_end;
@@ -139,16 +137,15 @@ let gen_func func_name argsl expr ppf =
     match pat with
     | Pattern.Pat_var name ->
       let off = (2 * Target.word_size) + (i * Target.word_size) in
-      Env.bind env name (Stack (S 0, off))
       (* s0 == fp *)
+      Env.bind env name (Stack (S 0, off))
     | _ -> failwith "Pattern not supported for arg");
   let local_count = 4 in
   let stack_size = (2 + local_count) * Target.word_size in
-  (* Emission.emit function prologue, then body into the queue, flush, and epilogue *)
   Emission.emit_prologue func_name stack_size;
-  let _env = gen_exp env (A 0) expr ppf in
-  Emission.flush_queue ppf;
-  Emission.emit_epilogue stack_size
+  let _env, _st = gen_exp env (A 0) expr ppf { frame_offset = 0 } in
+  Emission.emit_epilogue stack_size;
+  Emission.flush_queue ppf
 ;;
 
 let gen_start ppf =
@@ -180,10 +177,9 @@ let gen_program ppf program =
           gen_func name args body ppf
         | Pattern.Pat_var "main", expr ->
           Emission.emit_prologue "main" (4 * Target.word_size);
-          (* ЕСЛИ gen_exp монадический: запускаем со стартовым состоянием *)
           let _env, _st = gen_exp (Env.empty ()) (A 0) expr ppf { frame_offset = 0 } in
-          Emission.flush_queue ppf;
-          Emission.emit_epilogue 64
+          Emission.emit_epilogue 64;
+          Emission.flush_queue ppf
         | Pattern.Pat_var _name, _ -> ()
         | _ -> failwith "unsupported pattern")
     | _ -> ())
