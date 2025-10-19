@@ -96,7 +96,8 @@ module Emission = struct
     emit addi (S 0) SP (stack_size - (2 * Target.word_size))
   ;;
 
-  let emit_epilogue stack_size =
+  let emit_epilogue =
+    fun () ->
     emit addi SP (S 0) (2 * Target.word_size);
     (* sp = fp + 2*word *)
     emit ld RA (S 0, Target.word_size);

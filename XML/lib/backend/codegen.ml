@@ -150,7 +150,7 @@ let gen_func func_name argsl expr ppf =
   let stack_size = (2 + local_count) * Target.word_size in
   Emission.emit_prologue func_name stack_size;
   let _env, _st = gen_exp env (A 0) expr ppf { frame_offset = 0 } in
-  Emission.emit_epilogue stack_size;
+  Emission.emit_epilogue ();
   Emission.flush_queue ppf
 ;;
 
@@ -184,7 +184,7 @@ let gen_program ppf program =
         | Pattern.Pat_var "main", expr ->
           Emission.emit_prologue "main" (4 * Target.word_size);
           let _env, _st = gen_exp (Env.empty ()) (A 0) expr ppf { frame_offset = 0 } in
-          Emission.emit_epilogue 64;
+          Emission.emit_epilogue ();
           Emission.flush_queue ppf
         | Pattern.Pat_var _name, _ -> ()
         | _ -> failwith "unsupported pattern")

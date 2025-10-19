@@ -18,5 +18,5 @@ module Emission : sig
     -> (string, loc) Base.Hashtbl.t State.State.t
 
   val emit_prologue : string -> int -> unit
-  val emit_epilogue : int -> unit
+  val emit_epilogue : unit -> unit
 end
