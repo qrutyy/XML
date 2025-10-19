@@ -4,6 +4,7 @@
 
 module Target : sig
   val word_size : int
+  val arg_regs_count : int
   val arg_regs : string array
   val temp_regs : string array
 end

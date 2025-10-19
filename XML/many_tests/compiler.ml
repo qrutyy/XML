@@ -2,7 +2,6 @@
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
-open Common.Ast
 open Common.Parser
 open Format
 
@@ -24,12 +23,9 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
     main:
       addi sp, sp, -32
       sd ra, 24(sp)
@@ -38,8 +34,7 @@ let main =
       li t0, 1
       mv t2, t0
       li t1, 2
-      add t0, t2, t1
-      mv a0, t0
+      add a0, t2, t1
       call print_int
       li a0, 0
     |}]
@@ -54,15 +49,12 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     main:
       addi sp, sp, -32
@@ -72,8 +64,7 @@ let main =
       li t0, 5
       mv t2, t0
       li t1, 3
-      sub t0, t2, t1
-      mv a0, t0
+      sub a0, t2, t1
       call print_int
       li a0, 0
     |}]
@@ -88,15 +79,12 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     main:
       addi sp, sp, -32
@@ -106,8 +94,7 @@ let main =
       li t0, 6
       mv t2, t0
       li t1, 7
-      mul t0, t2, t1
-      mv a0, t0
+      mul a0, t2, t1
       call print_int
       li a0, 0
     |}]
@@ -123,15 +110,12 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     main:
       addi sp, sp, -32
@@ -143,12 +127,11 @@ let main =
       li t1, 3
       slt t0, t2, t1
       beq t0, zero, else_0
-      li t0, 11
+      li a0, 11
       j end_1
     else_0:
-      li t0, 22
+      li a0, 22
     end_1:
-      mv a0, t0
       call print_int
       li a0, 0
     |}]
@@ -163,15 +146,12 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     main:
       addi sp, sp, -32
@@ -183,12 +163,11 @@ let main =
       li t1, 4
       slt t0, t2, t1
       beq t0, zero, else_0
-      li t0, 1
+      li a0, 1
       j end_1
     else_0:
-      li t0, 0
+      li a0, 0
     end_1:
-      mv a0, t0
       call print_int
       li a0, 0
     |}]
@@ -203,15 +182,12 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     main:
       addi sp, sp, -32
@@ -223,12 +199,11 @@ let main =
       li t1, 3
       slt t0, t1, t2
       beq t0, zero, else_0
-      li t0, 7
+      li a0, 7
       j end_1
     else_0:
-      li t0, 9
+      li a0, 9
     end_1:
-      mv a0, t0
       call print_int
       li a0, 0
     |}]
@@ -243,15 +218,12 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     main:
       addi sp, sp, -32
@@ -264,12 +236,11 @@ let main =
       slt t0, t1, t2
       xori t0, t0, 1
       beq t0, zero, else_0
-      li t0, 10
+      li a0, 10
       j end_1
     else_0:
-      li t0, 20
+      li a0, 20
     end_1:
-      mv a0, t0
       call print_int
       li a0, 0
     |}]
@@ -284,15 +255,12 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     main:
       addi sp, sp, -32
@@ -305,12 +273,11 @@ let main =
       slt t0, t2, t1
       xori t0, t0, 1
       beq t0, zero, else_0
-      li t0, 8
+      li a0, 8
       j end_1
     else_0:
-      li t0, 9
+      li a0, 9
     end_1:
-      mv a0, t0
       call print_int
       li a0, 0
     |}]
@@ -325,15 +292,12 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     main:
       addi sp, sp, -32
@@ -346,12 +310,11 @@ let main =
       xor t0, t2, t1
       seqz t0, t0
       beq t0, zero, else_0
-      li t0, 1
+      li a0, 1
       j end_1
     else_0:
-      li t0, 2
+      li a0, 2
     end_1:
-      mv a0, t0
       call print_int
       li a0, 0
     |}]
@@ -370,38 +333,30 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     inc:
       addi sp, sp, -48
       sd ra, 40(sp)
       sd s0, 32(sp)
       addi s0, sp, 32
-      mv t2, t0
-      li t1, 1
-      add a0, t2, t1
+      mv t0, a0
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 48
       ret
     main:
       addi sp, sp, -32
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li t0, 41
-      mv a0, t0
+      li a0, 41
       call inc
-      mv t0, a0
-      mv a0, t0
       call print_int
       li a0, 0
     |}]
@@ -418,52 +373,30 @@ let main =
   let asm = compile_to_asm ast in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     sum:
       addi sp, sp, -48
       sd ra, 40(sp)
       sd s0, 32(sp)
       addi s0, sp, 32
-      mv t2, t0
-      li t1, 1
-      slt t0, t1, t2
-      xori t0, t0, 1
-      beq t0, zero, else_0
-      mv a0, a0
-      j end_1
-    else_0:
-      mv t2, t0
-      mv t2, t0
-      li t1, 1
-      sub t0, t2, t1
-      mv a0, t0
-      call sum
-      mv t1, a0
-      add a0, t2, t1
-    end_1:
+      mv t0, a0
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 48
       ret
     main:
       addi sp, sp, -32
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li t0, 5
-      mv a0, t0
+      li a0, 5
       call sum
-      mv t0, a0
-      mv a0, t0
       call print_int
       li a0, 0
     |}]
@@ -482,52 +415,30 @@ let main =
   let asm = compile_to_asm ast_factorial in
   print_endline asm;
   [%expect {|
-    .global _start
-    _start:
-      call main
-      li a7, 93
-      ecall
-
+    .section .text
+    .global main
+    .type main, @function
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     fac:
       addi sp, sp, -48
       sd ra, 40(sp)
       sd s0, 32(sp)
       addi s0, sp, 32
-      mv t2, t0
-      li t1, 1
-      slt t0, t1, t2
-      xori t0, t0, 1
-      beq t0, zero, else_0
-      li a0, 1
-      j end_1
-    else_0:
-      mv t2, t0
-      mv t2, t0
-      li t1, 1
-      sub t0, t2, t1
-      mv a0, t0
-      call fac
-      mv t1, a0
-      mul a0, t2, t1
-    end_1:
+      mv t0, a0
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 48
       ret
     main:
       addi sp, sp, -32
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li t0, 2
-      mv a0, t0
+      li a0, 2
       call fac
-      mv t0, a0
-      mv a0, t0
       call print_int
       li a0, 0
     |}]
@@ -545,7 +456,7 @@ let%expect_test "simple let" =
 
   (Failure ": end_of_input")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 532, characters 22-41
+  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 500, characters 22-41
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 let%expect_test "factorial_basic_codegen" =
@@ -554,30 +465,14 @@ let%expect_test "factorial_basic_codegen" =
   let asm = compile_to_asm ast_factorial in
   print_endline asm;
   [%expect {|
+      addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
-      addi sp, sp, 64
       ret
     fac:
       addi sp, sp, -48
       sd ra, 40(sp)
       sd s0, 32(sp)
       addi s0, sp, 32
-      mv t2, t0
-      li t1, 1
-      slt t0, t1, t2
-      xori t0, t0, 1
-      beq t0, zero, else_0
-      li a0, 1
-      j end_1
-    else_0:
-      mv t2, t0
-      mv t2, t0
-      li t1, 1
-      sub t0, t2, t1
-      mv a0, t0
-      call fac
-      mv t1, a0
-      mul a0, t2, t1
-    end_1:
+      mv t0, a0
     |}]

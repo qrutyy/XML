@@ -6,6 +6,11 @@ open Base
 open Format
 open Machine
 open Target
+open State
+
+type loc =
+  | Reg of reg
+  | Stack of offset
 
 module Emission = struct
   let code : (instr * string) Queue.t = Queue.create ()
@@ -40,7 +45,44 @@ module Emission = struct
       emit xori rd rd 1
     | _ -> failwith ("Unknown binary operator: " ^ op)
   ;;
-(*миша я переписал через емит чтобы у нас вся оработка шла черз один модуль*)
+
+  let spill_with_frame ?(comm = "") reg =
+    let open State in
+    let* () = move_frame_offset (fun fr_ofs -> fr_ofs + Target.word_size) in
+    let* state = get in
+    let ofs = -state.frame_offset in
+    emit sd reg (S 0, ofs) ~comm;
+    return (Stack (S 0, ofs))
+  ;;
+
+  let emit_save_caller_regs (env : (string, loc) Hashtbl.t) =
+    let open State in
+    (* собрать пары (name, reg) только для caller-saved *)
+    let regs =
+      Hashtbl.fold env ~init:[] ~f:(fun ~key:name ~data:loc acc ->
+        match loc with
+        | Reg r ->
+          (match r with
+           | A _ | T _ -> (name, r) :: acc
+           | _ -> acc)
+        | _ -> acc)
+      |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+    in
+    let spill_count = List.length regs in
+    let frame_size = spill_count * Target.word_size in
+    if frame_size > 0 then emit addi SP SP (-frame_size) ~comm:"Saving 'live' regs";
+    (* пролить каждый регистр и обновить env *)
+    let rec loop = function
+      | [] -> return env
+      | (name, r) :: tl ->
+        let* new_loc = spill_with_frame r in
+        Hashtbl.set env ~key:name ~data:new_loc;
+        loop tl
+    in
+    loop regs
+  ;;
+
+  (*миша я переписал через емит чтобы у нас вся оработка шла черз один модуль*)
   let emit_prologue name stack_size =
     (* name: *)
     emit label name;
@@ -55,9 +97,12 @@ module Emission = struct
   ;;
 
   let emit_epilogue stack_size =
-    emit addi SP (S 0) (2 * Target.word_size);  (* sp = fp + 2*word *)
-    emit ld  RA (S 0, Target.word_size);        (* ra = [fp+word] *)
-    emit ld  (S 0) (S 0, 0);                    (* fp = [fp+0] *)
+    emit addi SP (S 0) (2 * Target.word_size);
+    (* sp = fp + 2*word *)
+    emit ld RA (S 0, Target.word_size);
+    (* ra = [fp+word] *)
+    emit ld (S 0) (S 0, 0);
+    (* fp = [fp+0] *)
     emit ret
   ;;
 end
