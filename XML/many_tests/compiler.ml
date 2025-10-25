@@ -1068,22 +1068,72 @@ let main =
   ;;" in
   let asm = to_asm ast_two_arity_func in
   print_endline asm;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "Unbound identifier during codegen: fullsum")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Stdlib__List.iteri in file "list.ml" (inlined), line 114, characters 12-17
-  Called from Stdlib__List.iteri in file "list.ml", line 116, characters 16-27
-  Called from Backend__Codegen.gen_comp_expr in file "lib/backend/codegen.ml", line 147, characters 8-246
-  Called from Backend__Codegen.gen_anf_expr in file "lib/backend/codegen.ml", line 74, characters 28-63
-  Called from Backend__Codegen.gen_func in file "lib/backend/codegen.ml", line 232, characters 10-51
-  Called from Stdlib__List.iter in file "list.ml", line 110, characters 12-15
-  Called from Backend__Codegen.gen_program in file "lib/backend/codegen.ml", line 262, characters 2-439
-  Called from XML_manytests__Compiler.to_asm in file "many_tests/compiler.ml", line 13, characters 2-41
-  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 1103, characters 12-37
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{|
+    .section .text
+    .global main
+    .type main, @function
+    simplesum:
+      addi sp, sp, -24
+      sd ra, 16(sp)
+      sd s0, 8(sp)
+      addi s0, sp, 8
+      mv t0, a0
+      mv t1, a1
+      add t0, t0, t1
+      sd t0, -8(s0)
+      ld a0, -8(s0)
+      addi sp, s0, 16
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      ret
+    partialapp_sum:
+      addi sp, sp, -24
+      sd ra, 16(sp)
+      sd s0, 8(sp)
+      addi s0, sp, 8
+      la a0, simplesum
+      li a1, 2
+      call alloc_closure
+      mv t0, a0
+      mv a0, t0
+      li a1, 5
+      call apply1
+      mv t0, a0
+      sd t0, -8(s0)
+      ld a0, -8(s0)
+      addi sp, s0, 16
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      ret
+    fullsum:
+      addi sp, sp, -24
+      sd ra, 16(sp)
+      sd s0, 8(sp)
+      addi s0, sp, 8
+      call partialapp_sum
+      mv t0, a0
+      mv a0, t0
+      li a1, 5
+      call apply1
+      mv t0, a0
+      sd t0, -8(s0)
+      ld a0, -8(s0)
+      addi sp, s0, 16
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      ret
+    main:
+      addi sp, sp, -24
+      sd ra, 16(sp)
+      sd s0, 8(sp)
+      addi s0, sp, 8
+      call fullsum
+      call print_int
+      mv t0, a0
+      sd t0, -8(s0)
+      li a0, 0
+      addi sp, s0, 16
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      ret |}]
   

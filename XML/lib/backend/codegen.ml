@@ -92,7 +92,8 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
     gen_im_expr state (T 1) v2;
     emit_bin_op op dst (T 0) (T 1);
     state
-| Comp_app (func_imm, args_imms) ->
+  | Comp_app (func_imm, args_imms) ->
+    (* сохранить живые регистры *)
     let live_regs_to_save =
       Hashtbl.fold
         (fun _ loc acc ->
@@ -110,68 +111,81 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
     let m = List.length args_imms in
     let fname_opt, n_opt =
       match func_imm with
-      | Imm_ident name -> (Some name, ArityMap.find state.arity name)
-      | _ -> (None, None)
+      | Imm_ident name -> Some name, ArityMap.find state.arity name
+      | _ -> None, None
     in
-    begin match fname_opt, n_opt with
-    | Some fname, Some n ->
-      (*сразу вызываем чтобы не плодить closure*)
-        if m = n then (
-          List.iteri
-            (fun i arg_imm ->
-               if i < Array.length Target.arg_regs
-               then gen_im_expr state (A i) arg_imm
-               else failwith "Stack arguments for direct call not implemented")
-            args_imms;
-          emit call fname;
-          emit mv (T 0) (A 0)
-        ) else if m < n then (
-          (*создаем замыкание если передано меньше аргументов*)
-          emit la (A 0) fname;
-          emit li (A 1) n;
-          emit call "alloc_closure";
-          emit mv (T 0) (A 0);
-          List.iter
-            (fun arg_imm ->
-               if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
-               gen_im_expr state (A 1) arg_imm;
-               emit call "apply1";
-               emit mv (T 0) (A 0))
-            args_imms
-        ) else (
-          (*если больше аргументов - я считаю ошибка но стоит подумать могут ли быть другие случаи*)
-          failwith
-            (Printf.sprintf
-               "Too many arguments for function %s: expected %d, got %d"
-               fname n m)
-        )
-
-    | Some fname, None ->
-        List.iteri
-          (fun i arg_imm ->
-             if i < Array.length Target.arg_regs
-             then gen_im_expr state (A i) arg_imm
-             else failwith "Stack arguments for external calls not implemented")
-          args_imms;
-        emit call fname;
-        emit mv (T 0) (A 0)
-
-    | _ ->
-        gen_im_expr state (T 0) func_imm;
-        List.iter
-          (fun arg_imm ->
-             if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
-             gen_im_expr state (A 1) arg_imm;
-             emit call "apply1";
-             emit mv (T 0) (A 0))
-          args_imms
-    end;
+    (match fname_opt, n_opt with
+     | Some fname, Some n ->
+       if n = 0
+       then (
+         (* ноль арные функции - вызов *)
+         emit call fname;
+         emit mv (T 0) (A 0);
+         (* все аргументы пререданы - вызов*)
+         List.iter
+           (fun arg_imm ->
+              if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
+              gen_im_expr state (A 1) arg_imm;
+              emit call "apply1";
+              emit mv (T 0) (A 0))
+           args_imms)
+       else if m = n
+       then (
+         (* ровно насыщение: прямой вызов по ABI *)
+         List.iteri
+           (fun i arg_imm ->
+              if i < Array.length Target.arg_regs
+              then gen_im_expr state (A i) arg_imm
+              else failwith "Stack arguments for direct call not implemented")
+           args_imms;
+         emit call fname;
+         emit mv (T 0) (A 0))
+       else if m < n
+       then (
+         (*аргументов меньше чем арность функции - делаем замыкание*)
+         emit la (A 0) fname;
+         emit li (A 1) n;
+         emit call "alloc_closure";
+         emit mv (T 0) (A 0);
+         List.iter
+           (fun arg_imm ->
+              if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
+              gen_im_expr state (A 1) arg_imm;
+              emit call "apply1";
+              emit mv (T 0) (A 0))
+           args_imms)
+       else
+         (* излишние аргументы(но мб в будущем подумаем и уберем если найдем обоснование передачи большего числа аргументов) *)
+         failwith
+           (Printf.sprintf
+              "Too many arguments for function %s: expected %d, got %d"
+              fname
+              n
+              m)
+     | Some fname, None ->
+       (* для вызова функций из рантайма - имя функции но арность мы не задавали *)
+       List.iteri
+         (fun i arg_imm ->
+            if i < Array.length Target.arg_regs
+            then gen_im_expr state (A i) arg_imm
+            else failwith "Stack arguments for external calls not implemented")
+         args_imms;
+       emit call fname;
+       emit mv (T 0) (A 0)
+     | _ ->
+       gen_im_expr state (T 0) func_imm;
+       List.iter
+         (fun arg_imm ->
+            if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
+            gen_im_expr state (A 1) arg_imm;
+            emit call "apply1";
+            emit mv (T 0) (A 0))
+         args_imms);
     List.iter
       (fun reg ->
          emit ld reg (SP, 0);
          emit addi SP SP Target.word_size)
       (List.rev live_regs_to_save);
-
     if not (equal_reg dst (T 0)) then emit mv dst (T 0);
     state
   | Comp_branch (cond_imm, then_anf, else_anf) ->
@@ -243,6 +257,19 @@ let gen_start ppf =
   fprintf ppf ".type main, @function\n"
 ;;
 
+let prefill_arities (arity_map : ArityMap.t) (program : aprogram) =
+  let add name n = ArityMap.bind arity_map name n in
+  List.iter
+    (function
+      | Anf_str_value (_rf, name, anf_expr) ->
+        (match anf_expr with
+         | Anf_let (_, _, Comp_func (ps, _), _) -> add name (List.length ps)
+         | Anf_comp_expr (Comp_func (ps, _)) -> add name (List.length ps)
+         | _ -> add name 0)
+      | _ -> ())
+    program
+;;
+
 let gen_program ppf (program : aprogram) =
   label_counter := 0;
   let has_main =
@@ -253,18 +280,19 @@ let gen_program ppf (program : aprogram) =
       program
   in
   if has_main then gen_start ppf;
-  let arity = ArityMap.empty () in
+  let arity_map = ArityMap.empty () in
+  prefill_arities arity_map program;
   List.iter
     (function
       | Anf_str_value (_rf, name, Anf_let (_, _, Comp_func (ps, _), _)) ->
-        ArityMap.bind arity name (List.length ps)
+        ArityMap.bind arity_map name (List.length ps)
       | Anf_str_value (_rf, name, Anf_comp_expr (Comp_func (ps, _))) ->
-        ArityMap.bind arity name (List.length ps)
+        ArityMap.bind arity_map name (List.length ps)
       | _ -> ())
     program;
   List.iter
     (function
-      | Anf_str_eval anf_expr -> gen_func ~arity_map:arity "main" [] anf_expr ppf
+      | Anf_str_eval anf_expr -> gen_func ~arity_map "main" [] anf_expr ppf
       | Anf_str_value (_rec_flag, name, anf_expr) ->
         let params, body =
           match anf_expr with
@@ -272,10 +300,10 @@ let gen_program ppf (program : aprogram) =
           | Anf_comp_expr (Comp_func (ps, b)) -> ps, b
           | _ -> [], anf_expr
         in
-        gen_func ~arity_map:arity name params body ppf)
+        gen_func ~arity_map name params body ppf)
     program;
   List.iter
-    (fun (name, params, body) -> gen_func ~arity_map:arity name params body ppf)
+    (fun (name, params, body) -> gen_func ~arity_map name params body ppf)
     (List.rev !deferred_functions);
   flush_queue ppf
 ;;
