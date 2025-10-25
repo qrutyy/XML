@@ -28,7 +28,11 @@
     sd t0, -16(s0)
     addi sp, sp, -8
     sd a0, 0(sp)
-    ld a0, -16(s0)
+    ld t0, -16(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call fac
     mv t0, a0
     ld a0, 0(sp)
@@ -51,11 +55,19 @@
     sd ra, 24(sp)
     sd s0, 16(sp)
     addi s0, sp, 16
-    li a0, 4
+    li t0, 4
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call fac
     mv t0, a0
     sd t0, -8(s0)
-    ld a0, -8(s0)
+    ld t0, -8(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call print_int
     mv t0, a0
     sd t0, -16(s0)
@@ -101,7 +113,11 @@
     sd t0, -16(s0)
     addi sp, sp, -8
     sd a0, 0(sp)
-    ld a0, -16(s0)
+    ld t0, -16(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call fib
     mv t0, a0
     ld a0, 0(sp)
@@ -113,7 +129,11 @@
     sd t0, -32(s0)
     addi sp, sp, -8
     sd a0, 0(sp)
-    ld a0, -32(s0)
+    ld t0, -32(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call fib
     mv t0, a0
     ld a0, 0(sp)
@@ -136,11 +156,19 @@
     sd ra, 24(sp)
     sd s0, 16(sp)
     addi s0, sp, 16
-    li a0, 6
+    li t0, 6
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call fib
     mv t0, a0
     sd t0, -8(s0)
-    ld a0, -8(s0)
+    ld t0, -8(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call print_int
     mv t0, a0
     sd t0, -16(s0)
@@ -183,7 +211,11 @@
     beq t0, zero, else_0
     addi sp, sp, -8
     sd a0, 0(sp)
-    li a0, 0
+    li t0, 0
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call print_int
     mv t0, a0
     ld a0, 0(sp)
@@ -194,7 +226,11 @@
   else_0:
     addi sp, sp, -8
     sd a0, 0(sp)
-    li a0, 1
+    li t0, 1
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call print_int
     mv t0, a0
     ld a0, 0(sp)
@@ -228,7 +264,11 @@
     ld t0, -16(s0)
     j endif_3
   else_2:
-    li a0, 42
+    li t0, 42
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call print_int
     mv t0, a0
     sd t0, -16(s0)
@@ -261,7 +301,11 @@
     li t0, 1
   endif_7:
     sd t0, -40(s0)
-    ld a0, -40(s0)
+    ld t0, -40(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call large
     mv t0, a0
     sd t0, -48(s0)
@@ -306,14 +350,19 @@
     sd ra, 16(sp)
     sd s0, 8(sp)
     addi s0, sp, 8
+    addi sp, sp, -8
+    li t1, 5
+    sd t1, 0(sp)
     la a0, simplesum
     li a1, 2
     call alloc_closure
     mv t0, a0
+    ld t1, 0(sp)
     mv a0, t0
-    li a1, 5
+    mv a1, t1
     call apply1
     mv t0, a0
+    addi sp, sp, 8
     sd t0, -8(s0)
     ld a0, -8(s0)
     addi sp, s0, 16
@@ -327,12 +376,17 @@
     addi s0, sp, 16
     call partialapp_sum
     mv t0, a0
+    li t1, 5
     mv a0, t0
-    li a1, 5
+    mv a1, t1
     call apply1
     mv t0, a0
     sd t0, -8(s0)
-    ld a0, -8(s0)
+    ld t0, -8(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
     call print_int
     mv t0, a0
     sd t0, -16(s0)
@@ -347,3 +401,455 @@
   $ riscv64-linux-gnu-gcc temp.o runtime.o -o prog.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu -cpu rv64 ./prog.exe
   10
+
+
+
+====================== CPS Factorial ======================
+  $ ../bin/XML.exe -fromfile manytests/typed/010faccps_ll.ml -o 010faccps_ll.s
+
+  $ cat 010faccps_ll.s
+  .section .text
+  .global main
+  .type main, @function
+  id:
+    addi sp, sp, -16
+    sd ra, 8(sp)
+    sd s0, 0(sp)
+    addi s0, sp, 0
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  fresh_1:
+    addi sp, sp, -32
+    sd ra, 24(sp)
+    sd s0, 16(sp)
+    addi s0, sp, 16
+    mv t0, a2
+    mv t1, a0
+    mul t0, t0, t1
+    sd t0, -8(s0)
+    addi sp, sp, -8
+    sd a2, 0(sp)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    addi sp, sp, -8
+    sd a1, 0(sp)
+    mv t0, a1
+    ld t1, -8(s0)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    ld a2, 0(sp)
+    addi sp, sp, 8
+    sd t0, -16(s0)
+    ld a0, -16(s0)
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  fac_cps:
+    addi sp, sp, -48
+    sd ra, 40(sp)
+    sd s0, 32(sp)
+    addi s0, sp, 32
+    mv t0, a0
+    li t1, 1
+    xor t0, t0, t1
+    seqz t0, t0
+    sd t0, -8(s0)
+    ld t0, -8(s0)
+    beq t0, zero, else_0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    addi sp, sp, -8
+    sd a1, 0(sp)
+    mv t0, a1
+    li t1, 1
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    sd t0, -16(s0)
+    ld t0, -16(s0)
+    j endif_1
+  else_0:
+    mv t0, a0
+    li t1, 1
+    sub t0, t0, t1
+    sd t0, -16(s0)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    addi sp, sp, -8
+    sd a1, 0(sp)
+    addi sp, sp, -16
+    mv t1, a0
+    sd t1, 0(sp)
+    mv t1, a1
+    sd t1, 8(sp)
+    la a0, fresh_1
+    li a1, 3
+    call alloc_closure
+    mv t0, a0
+    ld t1, 0(sp)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    ld t1, 8(sp)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    addi sp, sp, 16
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    sd t0, -24(s0)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    addi sp, sp, -8
+    sd a1, 0(sp)
+    ld t0, -24(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld t0, -16(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    call fac_cps
+    mv t0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    sd t0, -32(s0)
+    ld t0, -32(s0)
+  endif_1:
+    sd t0, -16(s0)
+    ld a0, -16(s0)
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  main:
+    addi sp, sp, -32
+    sd ra, 24(sp)
+    sd s0, 16(sp)
+    addi s0, sp, 16
+    la a0, id
+    li a1, 1
+    call alloc_closure
+    mv t0, a0
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    li t0, 4
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    call fac_cps
+    mv t0, a0
+    sd t0, -8(s0)
+    ld t0, -8(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    call print_int
+    mv t0, a0
+    sd t0, -16(s0)
+    li a0, 0
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  $ riscv64-linux-gnu-as -march=rv64gc 010faccps_ll.s -o temp.o
+  $ riscv64-linux-gnu-gcc -c ../bin/runtime.c -o runtime.o
+  $ riscv64-linux-gnu-gcc temp.o runtime.o -o prog.exe
+  $ qemu-riscv64 -L /usr/riscv64-linux-gnu -cpu rv64 ./prog.exe
+  24
+
+====================== CPS Fibbo ======================
+  $ ../bin/XML.exe -fromfile manytests/typed/010fibcps_ll.ml -o 010fibcps_ll.s
+
+  $ cat 010fibcps_ll.s
+  .section .text
+  .global main
+  .type main, @function
+  id:
+    addi sp, sp, -16
+    sd ra, 8(sp)
+    sd s0, 0(sp)
+    addi s0, sp, 0
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  fresh_2:
+    addi sp, sp, -32
+    sd ra, 24(sp)
+    sd s0, 16(sp)
+    addi s0, sp, 16
+    mv t0, a0
+    mv t1, a2
+    add t0, t0, t1
+    sd t0, -8(s0)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    addi sp, sp, -8
+    sd a2, 0(sp)
+    addi sp, sp, -8
+    sd a1, 0(sp)
+    mv t0, a1
+    ld t1, -8(s0)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    ld a2, 0(sp)
+    addi sp, sp, 8
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    sd t0, -16(s0)
+    ld a0, -16(s0)
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  fresh_1:
+    addi sp, sp, -40
+    sd ra, 32(sp)
+    sd s0, 24(sp)
+    addi s0, sp, 24
+    mv t0, a0
+    li t1, 2
+    sub t0, t0, t1
+    sd t0, -8(s0)
+    addi sp, sp, -8
+    sd a3, 0(sp)
+    addi sp, sp, -8
+    sd a2, 0(sp)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    addi sp, sp, -8
+    sd a1, 0(sp)
+    addi sp, sp, -16
+    mv t1, a3
+    sd t1, 0(sp)
+    mv t1, a1
+    sd t1, 8(sp)
+    la a0, fresh_2
+    li a1, 3
+    call alloc_closure
+    mv t0, a0
+    ld t1, 0(sp)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    ld t1, 8(sp)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    addi sp, sp, 16
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    ld a2, 0(sp)
+    addi sp, sp, 8
+    ld a3, 0(sp)
+    addi sp, sp, 8
+    sd t0, -16(s0)
+    addi sp, sp, -8
+    sd a3, 0(sp)
+    addi sp, sp, -8
+    sd a2, 0(sp)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    addi sp, sp, -8
+    sd a1, 0(sp)
+    mv t0, a2
+    ld t1, -8(s0)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    ld t1, -16(s0)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    ld a2, 0(sp)
+    addi sp, sp, 8
+    ld a3, 0(sp)
+    addi sp, sp, 8
+    sd t0, -24(s0)
+    ld a0, -24(s0)
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  fib:
+    addi sp, sp, -48
+    sd ra, 40(sp)
+    sd s0, 32(sp)
+    addi s0, sp, 32
+    mv t0, a0
+    li t1, 2
+    slt t0, t0, t1
+    sd t0, -8(s0)
+    ld t0, -8(s0)
+    beq t0, zero, else_0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    addi sp, sp, -8
+    sd a1, 0(sp)
+    mv t0, a1
+    mv t1, a0
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    sd t0, -16(s0)
+    ld t0, -16(s0)
+    j endif_1
+  else_0:
+    mv t0, a0
+    li t1, 1
+    sub t0, t0, t1
+    sd t0, -16(s0)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    addi sp, sp, -8
+    sd a1, 0(sp)
+    addi sp, sp, -24
+    mv t1, a0
+    sd t1, 0(sp)
+    mv t1, a1
+    sd t1, 8(sp)
+    la a0, fib
+    li a1, 2
+    call alloc_closure
+    mv t1, a0
+    sd t1, 16(sp)
+    la a0, fresh_1
+    li a1, 4
+    call alloc_closure
+    mv t0, a0
+    ld t1, 0(sp)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    ld t1, 8(sp)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    ld t1, 16(sp)
+    mv a0, t0
+    mv a1, t1
+    call apply1
+    mv t0, a0
+    addi sp, sp, 24
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    sd t0, -24(s0)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    addi sp, sp, -8
+    sd a1, 0(sp)
+    ld t0, -24(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld t0, -16(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    call fib
+    mv t0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    sd t0, -32(s0)
+    ld t0, -32(s0)
+  endif_1:
+    sd t0, -16(s0)
+    ld a0, -16(s0)
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  main:
+    addi sp, sp, -32
+    sd ra, 24(sp)
+    sd s0, 16(sp)
+    addi s0, sp, 16
+    la a0, id
+    li a1, 1
+    call alloc_closure
+    mv t0, a0
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    li t0, 6
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    call fib
+    mv t0, a0
+    sd t0, -8(s0)
+    ld t0, -8(s0)
+    addi sp, sp, -8
+    sd t0, 0(sp)
+    ld a0, 0(sp)
+    addi sp, sp, 8
+    call print_int
+    mv t0, a0
+    sd t0, -16(s0)
+    li a0, 0
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  $ riscv64-linux-gnu-as -march=rv64gc 010fibcps_ll.s -o temp.o
+  $ riscv64-linux-gnu-gcc -c ../bin/runtime.c -o runtime.o
+  $ riscv64-linux-gnu-gcc temp.o runtime.o -o prog.exe
+  $ qemu-riscv64 -L /usr/riscv64-linux-gnu -cpu rv64 ./prog.exe
+  8

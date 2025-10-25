@@ -10,6 +10,7 @@ open Format
 
 type options =
   { mutable input_file_name : string option
+  ; mutable from_file_name : string option
   ; mutable output_file_name : string option
   ; mutable show_ast : bool
   ; mutable show_anf : bool
@@ -64,6 +65,18 @@ let read_channel_to_string ic =
   | End_of_file -> Buffer.contents buf
 ;;
 
+let read_file path =
+  try
+    let ch = open_in path in
+    let s = really_input_string ch (in_channel_length ch) in
+    close_in ch;
+    s
+  with
+  | Sys_error msg ->
+    eprintf "Error: Could not read input file '%s': %s\n" path msg;
+    exit 1
+;;
+
 (* ------------------------------- *)
 (*           Main Driver           *)
 (* ------------------------------- *)
@@ -71,6 +84,7 @@ let read_channel_to_string ic =
 let () =
   let options =
     { input_file_name = None
+    ; from_file_name = None
     ; output_file_name = None
     ; show_ast = false
     ; show_anf = false
@@ -92,6 +106,9 @@ let () =
     ; ( "--anf"
       , Arg.Unit (fun () -> options.show_anf <- true)
       , "         Show the ANF representation and exit" )
+    ; ( "-fromfile"
+      , Arg.String (fun fname -> options.from_file_name <- Some fname)
+      , " <file>  Read source from file (preferred over positional arg)" )
     ]
   in
   let handle_anon_arg filename =
@@ -104,18 +121,10 @@ let () =
   in
   Arg.parse arg_specs handle_anon_arg usage_msg;
   let source_code =
-    match options.input_file_name with
-    | Some path ->
-      (try
-         let ch = open_in path in
-         let s = really_input_string ch (in_channel_length ch) in
-         close_in ch;
-         s
-       with
-       | Sys_error msg ->
-         eprintf "Error: Could not read input file: %s\n" msg;
-         exit 1)
-    | None -> read_channel_to_string stdin
+    match options.from_file_name, options.input_file_name with
+    | Some path, _ -> read_file path
+    | None, Some path -> read_file path
+    | None, None -> read_channel_to_string stdin
   in
   compile_and_write options source_code
 ;;

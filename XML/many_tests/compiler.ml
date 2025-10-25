@@ -35,7 +35,11 @@ let main =
       sd ra, 16(sp)
       sd s0, 8(sp)
       addi s0, sp, 8
-      li a0, 3
+      li t0, 3
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -8(s0)
@@ -64,7 +68,11 @@ let main =
       sd ra, 16(sp)
       sd s0, 8(sp)
       addi s0, sp, 8
-      li a0, 2
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -8(s0)
@@ -93,7 +101,11 @@ let main =
       sd ra, 16(sp)
       sd s0, 8(sp)
       addi s0, sp, 8
-      li a0, 42
+      li t0, 42
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -8(s0)
@@ -135,7 +147,11 @@ let main =
       li t0, 22
     endif_1:
       sd t0, -16(s0)
-      ld a0, -16(s0)
+      ld t0, -16(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -24(s0)
@@ -176,7 +192,11 @@ let main =
       li t0, 0
     endif_1:
       sd t0, -16(s0)
-      ld a0, -16(s0)
+      ld t0, -16(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -24(s0)
@@ -217,7 +237,11 @@ let main =
       li t0, 9
     endif_1:
       sd t0, -16(s0)
-      ld a0, -16(s0)
+      ld t0, -16(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -24(s0)
@@ -259,7 +283,11 @@ let main =
       li t0, 20
     endif_1:
       sd t0, -16(s0)
-      ld a0, -16(s0)
+      ld t0, -16(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -24(s0)
@@ -301,7 +329,11 @@ let main =
       li t0, 9
     endif_1:
       sd t0, -16(s0)
-      ld a0, -16(s0)
+      ld t0, -16(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -24(s0)
@@ -343,7 +375,11 @@ let main =
       li t0, 2
     endif_1:
       sd t0, -16(s0)
-      ld a0, -16(s0)
+      ld t0, -16(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -24(s0)
@@ -390,11 +426,19 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li a0, 41
+      li t0, 41
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call inc
       mv t0, a0
       sd t0, -8(s0)
-      ld a0, -8(s0)
+      ld t0, -8(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -16(s0)
@@ -441,7 +485,11 @@ let main =
       sd t0, -16(s0)
       addi sp, sp, -8
       sd a0, 0(sp)
-      ld a0, -16(s0)
+      ld t0, -16(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call sum
       mv t0, a0
       ld a0, 0(sp)
@@ -464,11 +512,19 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li a0, 5
+      li t0, 5
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call sum
       mv t0, a0
       sd t0, -8(s0)
-      ld a0, -8(s0)
+      ld t0, -8(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -16(s0)
@@ -516,7 +572,11 @@ let main =
       sd t0, -16(s0)
       addi sp, sp, -8
       sd a0, 0(sp)
-      ld a0, -16(s0)
+      ld t0, -16(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call fac
       mv t0, a0
       ld a0, 0(sp)
@@ -539,11 +599,19 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li a0, 2
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call fac
       mv t0, a0
       sd t0, -8(s0)
-      ld a0, -8(s0)
+      ld t0, -8(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -16(s0)
@@ -581,7 +649,11 @@ let%expect_test "factorial_basic_codegen" =
       sd t0, -16(s0)
       addi sp, sp, -8
       sd a0, 0(sp)
-      ld a0, -16(s0)
+      ld t0, -16(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call fac
       mv t0, a0
       ld a0, 0(sp)
@@ -632,7 +704,11 @@ let%expect_test "ifs" =
       beq t0, zero, else_0
       addi sp, sp, -8
       sd a0, 0(sp)
-      li a0, 0
+      li t0, 0
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       ld a0, 0(sp)
@@ -643,7 +719,11 @@ let%expect_test "ifs" =
     else_0:
       addi sp, sp, -8
       sd a0, 0(sp)
-      li a0, 1
+      li t0, 1
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       ld a0, 0(sp)
@@ -667,7 +747,11 @@ let%expect_test "ifs" =
       li t0, 0
       j endif_3
     else_2:
-      li a0, 42
+      li t0, 42
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -8(s0)
@@ -690,7 +774,11 @@ let%expect_test "ifs" =
       li t0, 1
     endif_7:
       sd t0, -24(s0)
-      ld a0, -24(s0)
+      ld t0, -24(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call large
       mv t0, a0
       sd t0, -32(s0)
@@ -731,7 +819,11 @@ let%expect_test "ifs" =
       beq t0, zero, else_0
       addi sp, sp, -8
       sd a0, 0(sp)
-      li a0, 0
+      li t0, 0
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       ld a0, 0(sp)
@@ -742,7 +834,11 @@ let%expect_test "ifs" =
     else_0:
       addi sp, sp, -8
       sd a0, 0(sp)
-      li a0, 1
+      li t0, 1
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       ld a0, 0(sp)
@@ -766,7 +862,11 @@ let%expect_test "ifs" =
       li t0, 0
       j endif_3
     else_2:
-      li a0, 42
+      li t0, 42
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -8(s0)
@@ -789,7 +889,11 @@ let%expect_test "ifs" =
       li t0, 1
     endif_7:
       sd t0, -24(s0)
-      ld a0, -24(s0)
+      ld t0, -24(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call large
       mv t0, a0
       sd t0, -32(s0)
@@ -834,7 +938,11 @@ let main =
       sd t0, -16(s0)
       addi sp, sp, -8
       sd a0, 0(sp)
-      ld a0, -16(s0)
+      ld t0, -16(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call fib
       mv t0, a0
       ld a0, 0(sp)
@@ -846,7 +954,11 @@ let main =
       sd t0, -32(s0)
       addi sp, sp, -8
       sd a0, 0(sp)
-      ld a0, -32(s0)
+      ld t0, -32(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call fib
       mv t0, a0
       ld a0, 0(sp)
@@ -869,11 +981,19 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li a0, 2
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call fib
       mv t0, a0
       sd t0, -8(s0)
-      ld a0, -8(s0)
+      ld t0, -8(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -16(s0)
@@ -962,12 +1082,24 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li a0, 2
-      li a1, 2
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
+      ld a1, 0(sp)
+      addi sp, sp, 8
       call simplesum
       mv t0, a0
       sd t0, -8(s0)
-      ld a0, -8(s0)
+      ld t0, -8(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -16(s0)
@@ -1033,18 +1165,54 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li a0, 2
-      li a1, 2
-      li a2, 2
-      li a3, 2
-      li a4, 2
-      li a5, 2
-      li a6, 2
-      li a7, 2
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      li t0, 2
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
+      ld a1, 0(sp)
+      addi sp, sp, 8
+      ld a2, 0(sp)
+      addi sp, sp, 8
+      ld a3, 0(sp)
+      addi sp, sp, 8
+      ld a4, 0(sp)
+      addi sp, sp, 8
+      ld a5, 0(sp)
+      addi sp, sp, 8
+      ld a6, 0(sp)
+      addi sp, sp, 8
+      ld a7, 0(sp)
+      addi sp, sp, 8
       call simplesum
       mv t0, a0
       sd t0, -8(s0)
-      ld a0, -8(s0)
+      ld t0, -8(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -16(s0)
@@ -1089,14 +1257,19 @@ let main =
       sd ra, 16(sp)
       sd s0, 8(sp)
       addi s0, sp, 8
+      addi sp, sp, -8
+      li t1, 5
+      sd t1, 0(sp)
       la a0, simplesum
       li a1, 2
       call alloc_closure
       mv t0, a0
+      ld t1, 0(sp)
       mv a0, t0
-      li a1, 5
+      mv a1, t1
       call apply1
       mv t0, a0
+      addi sp, sp, 8
       sd t0, -8(s0)
       ld a0, -8(s0)
       addi sp, s0, 16
@@ -1110,12 +1283,17 @@ let main =
       addi s0, sp, 16
       call partialapp_sum
       mv t0, a0
+      li t1, 5
       mv a0, t0
-      li a1, 5
+      mv a1, t1
       call apply1
       mv t0, a0
       sd t0, -8(s0)
-      ld a0, -8(s0)
+      ld t0, -8(s0)
+      addi sp, sp, -8
+      sd t0, 0(sp)
+      ld a0, 0(sp)
+      addi sp, sp, 8
       call print_int
       mv t0, a0
       sd t0, -16(s0)

@@ -93,7 +93,6 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
     emit_bin_op op dst (T 0) (T 1);
     state
   | Comp_app (func_imm, args_imms) ->
-    (* сохранить живые регистры *)
     let live_regs_to_save =
       Hashtbl.fold
         (fun _ loc acc ->
@@ -108,79 +107,86 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
          emit addi SP SP (-Target.word_size);
          emit sd reg (SP, 0))
       live_regs_to_save;
-    let m = List.length args_imms in
-    let fname_opt, n_opt =
-      match func_imm with
-      | Imm_ident name -> Some name, ArityMap.find state.arity name
-      | _ -> None, None
+    let argc = List.length args_imms in
+    let apply_chain () =
+      List.iter
+        (fun arg_imm ->
+           gen_im_expr state (T 1) arg_imm;
+           emit mv (A 0) (T 0);
+           emit mv (A 1) (T 1);
+           emit call "apply1";
+           emit mv (T 0) (A 0))
+        args_imms
     in
-    (match fname_opt, n_opt with
-     | Some fname, Some n ->
-       if n = 0
-       then (
-         (* ноль арные функции - вызов *)
-         emit call fname;
-         emit mv (T 0) (A 0);
-         (* все аргументы пререданы - вызов*)
-         List.iter
-           (fun arg_imm ->
-              if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
-              gen_im_expr state (A 1) arg_imm;
-              emit call "apply1";
-              emit mv (T 0) (A 0))
-           args_imms)
-       else if m = n
-       then (
-         (* ровно насыщение: прямой вызов по ABI *)
-         List.iteri
-           (fun i arg_imm ->
-              if i < Array.length Target.arg_regs
-              then gen_im_expr state (A i) arg_imm
-              else failwith "Stack arguments for direct call not implemented")
-           args_imms;
-         emit call fname;
-         emit mv (T 0) (A 0))
-       else if m < n
-       then (
-         (*аргументов меньше чем арность функции - делаем замыкание*)
-         emit la (A 0) fname;
-         emit li (A 1) n;
-         emit call "alloc_closure";
-         emit mv (T 0) (A 0);
-         List.iter
-           (fun arg_imm ->
-              if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
-              gen_im_expr state (A 1) arg_imm;
-              emit call "apply1";
-              emit mv (T 0) (A 0))
-           args_imms)
-       else
-         (* излишние аргументы(но мб в будущем подумаем и уберем если найдем обоснование передачи большего числа аргументов) *)
-         failwith
-           (Printf.sprintf
-              "Too many arguments for function %s: expected %d, got %d"
-              fname
-              n
-              m)
-     | Some fname, None ->
-       (* для вызова функций из рантайма - имя функции но арность мы не задавали *)
-       List.iteri
-         (fun i arg_imm ->
-            if i < Array.length Target.arg_regs
-            then gen_im_expr state (A i) arg_imm
-            else failwith "Stack arguments for external calls not implemented")
-         args_imms;
-       emit call fname;
-       emit mv (T 0) (A 0)
-     | _ ->
+    (match func_imm with
+     | Imm_ident fname when Env.find state.env fname <> None ->
        gen_im_expr state (T 0) func_imm;
-       List.iter
-         (fun arg_imm ->
-            if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
-            gen_im_expr state (A 1) arg_imm;
-            emit call "apply1";
+       apply_chain ()
+     | Imm_ident fname ->
+       (match ArityMap.find state.arity fname with
+        | Some n when n = 0 ->
+          emit call fname;
+          emit mv (T 0) (A 0);
+          apply_chain ()
+        | Some n ->
+          if argc = n
+          then (
+            List.iter
+              (fun arg_imm ->
+                 gen_im_expr state (T 0) arg_imm;
+                 emit addi SP SP (-Target.word_size);
+                 emit sd (T 0) (SP, 0))
+              (List.rev args_imms);
+            List.iteri
+              (fun i _ ->
+                 if i < Array.length Target.arg_regs
+                 then (
+                   emit ld (A i) (SP, 0);
+                   emit addi SP SP Target.word_size)
+                 else failwith "Stack arguments for direct call not implemented")
+              args_imms;
+            emit call fname;
             emit mv (T 0) (A 0))
-         args_imms);
+          else if argc < n
+          then (
+            let m = List.length args_imms in
+            if m > 0 then emit addi SP SP (-m * Target.word_size);
+            List.iteri
+              (fun i arg_imm ->
+                 gen_im_expr state (T 1) arg_imm;
+                 emit sd (T 1) (SP, i * Target.word_size))
+              args_imms;
+            emit la (A 0) fname;
+            emit li (A 1) n;
+            emit call "alloc_closure";
+            emit mv (T 0) (A 0);
+            List.iteri
+              (fun i _ ->
+                 emit ld (T 1) (SP, i * Target.word_size);
+                 emit mv (A 0) (T 0);
+                 emit mv (A 1) (T 1);
+                 emit call "apply1";
+                 emit mv (T 0) (A 0))
+              args_imms;
+            if m > 0 then emit addi SP SP (m * Target.word_size))
+        | None ->
+          List.iter
+            (fun arg_imm ->
+               gen_im_expr state (T 0) arg_imm;
+               emit addi SP SP (-Target.word_size);
+               emit sd (T 0) (SP, 0))
+            (List.rev args_imms);
+          List.iteri
+            (fun i _ ->
+               if i < Array.length Target.arg_regs
+               then (
+                 emit ld (A i) (SP, 0);
+                 emit addi SP SP Target.word_size)
+               else failwith "Stack arguments for external calls not implemented")
+            args_imms;
+          emit call fname;
+          emit mv (T 0) (A 0))
+     | Imm_num _ -> failwith "Runtime error: attempted to call a number.");
     List.iter
       (fun reg ->
          emit ld reg (SP, 0);

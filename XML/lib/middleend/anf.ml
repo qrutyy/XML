@@ -130,10 +130,11 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
          | (Comp_imm _ | Comp_binop _ | Comp_app _ | Comp_branch _) as ce ->
            let body_anf = norm_comp body k in
            Anf_let (rec_flag, x, ce, body_anf))
-     | Pattern.Pat_construct ("()", None) ->
+     | Pattern.Pat_any | Pattern.Pat_construct ("()", None) ->
        norm_comp vb_expr (fun ce ->
+         let tmp = get_new_temp_reg () in
          let body_anf = norm_comp body k in
-         Anf_let (Nonrecursive, "_", ce, body_anf))
+         Anf_let (Nonrecursive, tmp, ce, body_anf))
      | _ -> failwith ("Unsupported pattern in `let`-binding: " ^ Pattern.show pat))
   | _ -> failwith "unsupported expression in ANF normaliser"
 
