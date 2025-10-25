@@ -16,4 +16,8 @@
 
 (cram
  (applies_to codegen anf)
- (deps ../bin/XML.exe ../bin/runtime.c))
+ (deps
+  ../bin/XML.exe
+  ../bin/runtime.c
+  manytests/typed/010faccps_ll.ml
+  manytests/typed/010fibcps_ll.ml))

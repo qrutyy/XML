@@ -1059,11 +1059,9 @@ let%expect_test "partial application func" =
   let ast_two_arity_func = parse_str "let simplesum x y = x + y
 
 let partialapp_sum = simplesum 5
-  
-let fullsum = partialapp_sum 5
 
 let main =
-  let () = print_int (fullsum) in
+  let () = print_int (partialapp_sum 5) in
   0
   ;;" in
   let asm = to_asm ast_two_arity_func in
@@ -1105,11 +1103,11 @@ let main =
       ld ra, 8(s0)
       ld s0, 0(s0)
       ret
-    fullsum:
-      addi sp, sp, -24
-      sd ra, 16(sp)
-      sd s0, 8(sp)
-      addi s0, sp, 8
+    main:
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
       call partialapp_sum
       mv t0, a0
       mv a0, t0
@@ -1118,19 +1116,9 @@ let main =
       mv t0, a0
       sd t0, -8(s0)
       ld a0, -8(s0)
-      addi sp, s0, 16
-      ld ra, 8(s0)
-      ld s0, 0(s0)
-      ret
-    main:
-      addi sp, sp, -24
-      sd ra, 16(sp)
-      sd s0, 8(sp)
-      addi s0, sp, 8
-      call fullsum
       call print_int
       mv t0, a0
-      sd t0, -8(s0)
+      sd t0, -16(s0)
       li a0, 0
       addi sp, s0, 16
       ld ra, 8(s0)

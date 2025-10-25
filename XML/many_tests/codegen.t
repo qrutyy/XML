@@ -276,3 +276,74 @@
   $ riscv64-linux-gnu-gcc temp.o runtime.o -o prog.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu -cpu rv64 ./prog.exe
   420
+
+
+====================== Simple Closure ======================
+  $ ../bin/XML.exe -o closure.s <<EOF
+  > let simplesum x y = x + y
+  > let partialapp_sum = simplesum 5
+  > let main = print_int (partialapp_sum 5)
+  $ cat closure.s
+  .section .text
+  .global main
+  .type main, @function
+  simplesum:
+    addi sp, sp, -24
+    sd ra, 16(sp)
+    sd s0, 8(sp)
+    addi s0, sp, 8
+    mv t0, a0
+    mv t1, a1
+    add t0, t0, t1
+    sd t0, -8(s0)
+    ld a0, -8(s0)
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  partialapp_sum:
+    addi sp, sp, -24
+    sd ra, 16(sp)
+    sd s0, 8(sp)
+    addi s0, sp, 8
+    la a0, simplesum
+    li a1, 2
+    call alloc_closure
+    mv t0, a0
+    mv a0, t0
+    li a1, 5
+    call apply1
+    mv t0, a0
+    sd t0, -8(s0)
+    ld a0, -8(s0)
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+  main:
+    addi sp, sp, -32
+    sd ra, 24(sp)
+    sd s0, 16(sp)
+    addi s0, sp, 16
+    call partialapp_sum
+    mv t0, a0
+    mv a0, t0
+    li a1, 5
+    call apply1
+    mv t0, a0
+    sd t0, -8(s0)
+    ld a0, -8(s0)
+    call print_int
+    mv t0, a0
+    sd t0, -16(s0)
+    ld a0, -16(s0)
+    addi sp, s0, 16
+    ld ra, 8(s0)
+    ld s0, 0(s0)
+    ret
+
+  $ riscv64-linux-gnu-as -march=rv64gc closure.s -o temp.o
+  $ riscv64-linux-gnu-gcc -c ../bin/runtime.c -o runtime.o
+  $ riscv64-linux-gnu-gcc temp.o runtime.o -o prog.exe
+  $ qemu-riscv64 -L /usr/riscv64-linux-gnu -cpu rv64 ./prog.exe
+  10
