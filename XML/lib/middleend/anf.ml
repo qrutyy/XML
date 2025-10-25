@@ -52,10 +52,20 @@ let get_new_temp_reg =
     name
 ;;
 
+let pat_vars = function
+  | Pattern.Pat_var p -> [p]
+  | _ -> failwith "Only simple variable patterns are allowed in function parameters"
+;;
+
 let rec collect_params_and_body expr acc =
   match expr with
-  | Exp_fun ((Pattern.Pat_var p, []), body) -> collect_params_and_body body (p :: acc)
-  | _ -> List.rev acc, expr
+  | Exp_fun ((first_pat, rest_pats), body) ->
+      let vars =
+        pat_vars first_pat @ List.(concat (map pat_vars rest_pats))
+      in
+      collect_params_and_body body (acc @ vars)
+  | _ ->
+      acc, expr
 ;;
 
 let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =

@@ -3,6 +3,7 @@
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 open Common.Parser
+open Common.Ast
 open Format
 
 let to_asm ast =
@@ -12,6 +13,9 @@ let to_asm ast =
   Backend.Codegen.gen_program ppf anf_ast;
   pp_print_flush ppf ();
   Buffer.contents buf
+
+(* need it to faster examing problems for example how we pass args and so on*)
+let pp_ast str = print_endline (show_program (parse_str str))
 
 (*--- аст для арифметичских операций*)
 let%expect_test "add_codegen" =
@@ -879,3 +883,173 @@ let main =
       ld s0, 0(s0)
       ret
     |}]
+
+let%expect_test "two arity func" =
+  pp_ast "let simplesum x y z = x + y + z
+
+let main =
+  let () = print_int (simplesum 2 2) in
+  0
+  ;;";
+ [%expect
+    {|
+      [(Str_value (Nonrecursive,
+          ({ pat = (Pat_var "simplesum");
+             expr =
+             (Exp_fun (((Pat_var "x"), [(Pat_var "y"); (Pat_var "z")]),
+                (Exp_apply ((Exp_ident "+"),
+                   (Exp_tuple
+                      ((Exp_apply ((Exp_ident "+"),
+                          (Exp_tuple ((Exp_ident "x"), (Exp_ident "y"), [])))),
+                       (Exp_ident "z"), []))
+                   ))
+                ))
+             },
+           [])
+          ));
+        (Str_value (Nonrecursive,
+           ({ pat = (Pat_var "main");
+              expr =
+              (Exp_let (Nonrecursive,
+                 ({ pat = (Pat_construct ("()", None));
+                    expr =
+                    (Exp_apply ((Exp_ident "print_int"),
+                       (Exp_apply (
+                          (Exp_apply ((Exp_ident "simplesum"),
+                             (Exp_constant (Const_integer 2)))),
+                          (Exp_constant (Const_integer 2))))
+                       ))
+                    },
+                  []),
+                 (Exp_constant (Const_integer 0))))
+              },
+            [])
+           ))
+        ] |}]
+;;
+
+(*AST for two or more arity funcs*)
+
+let%expect_test "two arity func" =
+  let ast_two_arity_func = parse_str "let simplesum x y = x + y
+
+let main =
+  let () = print_int (simplesum 2 2) in
+  0
+  ;;" in
+  let asm = to_asm ast_two_arity_func in
+  print_endline asm;
+  [%expect{|
+    .section .text
+    .global main
+    .type main, @function
+    simplesum:
+      addi sp, sp, -24
+      sd ra, 16(sp)
+      sd s0, 8(sp)
+      addi s0, sp, 8
+      mv t0, a0
+      mv t1, a1
+      add t0, t0, t1
+      sd t0, -8(s0)
+      ld a0, -8(s0)
+      addi sp, s0, 16
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      ret
+    main:
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      li a0, 2
+      li a1, 2
+      call simplesum
+      mv t0, a0
+      sd t0, -8(s0)
+      ld a0, -8(s0)
+      call print_int
+      mv t0, a0
+      sd t0, -16(s0)
+      li a0, 0
+      addi sp, s0, 16
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      ret |}]
+
+let%expect_test "max arity func due two registers" =
+  let ast_two_arity_func = parse_str "let simplesum a b c d e f g h  = a + b + c + d + e + f + g + h
+
+let main =
+  let () = print_int (simplesum 2 2 2 2 2 2 2 2) in
+  0
+  ;;" in
+  let asm = to_asm ast_two_arity_func in
+  print_endline asm;
+  [%expect{|
+    .section .text
+    .global main
+    .type main, @function
+    simplesum:
+      addi sp, sp, -72
+      sd ra, 64(sp)
+      sd s0, 56(sp)
+      addi s0, sp, 56
+      mv t0, a0
+      mv t1, a1
+      add t0, t0, t1
+      sd t0, -8(s0)
+      ld t0, -8(s0)
+      mv t1, a2
+      add t0, t0, t1
+      sd t0, -16(s0)
+      ld t0, -16(s0)
+      mv t1, a3
+      add t0, t0, t1
+      sd t0, -24(s0)
+      ld t0, -24(s0)
+      mv t1, a4
+      add t0, t0, t1
+      sd t0, -32(s0)
+      ld t0, -32(s0)
+      mv t1, a5
+      add t0, t0, t1
+      sd t0, -40(s0)
+      ld t0, -40(s0)
+      mv t1, a6
+      add t0, t0, t1
+      sd t0, -48(s0)
+      ld t0, -48(s0)
+      mv t1, a7
+      add t0, t0, t1
+      sd t0, -56(s0)
+      ld a0, -56(s0)
+      addi sp, s0, 16
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      ret
+    main:
+      addi sp, sp, -32
+      sd ra, 24(sp)
+      sd s0, 16(sp)
+      addi s0, sp, 16
+      li a0, 2
+      li a1, 2
+      li a2, 2
+      li a3, 2
+      li a4, 2
+      li a5, 2
+      li a6, 2
+      li a7, 2
+      call simplesum
+      mv t0, a0
+      sd t0, -8(s0)
+      ld a0, -8(s0)
+      call print_int
+      mv t0, a0
+      sd t0, -16(s0)
+      li a0, 0
+      addi sp, s0, 16
+      ld ra, 8(s0)
+      ld s0, 0(s0)
+      ret |}]
