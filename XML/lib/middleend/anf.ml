@@ -44,6 +44,12 @@ let normalise_const = function
   | Const_string e -> Imm_ident e
 ;;
 
+let flatten_arg_expr e =
+  match e with
+  | Exp_tuple (e1, e2, rest) -> e1 :: e2 :: rest
+  | _ -> [ e ]
+;;
+
 let get_new_temp_reg =
   let counter = ref 0 in
   fun () ->
@@ -53,19 +59,16 @@ let get_new_temp_reg =
 ;;
 
 let pat_vars = function
-  | Pattern.Pat_var p -> [p]
+  | Pattern.Pat_var p -> [ p ]
   | _ -> failwith "Only simple variable patterns are allowed in function parameters"
 ;;
 
 let rec collect_params_and_body expr acc =
   match expr with
   | Exp_fun ((first_pat, rest_pats), body) ->
-      let vars =
-        pat_vars first_pat @ List.(concat (map pat_vars rest_pats))
-      in
-      collect_params_and_body body (acc @ vars)
-  | _ ->
-      acc, expr
+    let vars = pat_vars first_pat @ List.(concat (map pat_vars rest_pats)) in
+    collect_params_and_body body (acc @ vars)
+  | _ -> acc, expr
 ;;
 
 let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
@@ -97,8 +100,9 @@ let rec norm_comp expr (k : comp_expr -> anf_expr) : anf_expr =
       | f -> f, acc
     in
     let func_expr, args_exprs = collect_args_and_func expr [] in
+    let flat_args = List.concat (List.map flatten_arg_expr args_exprs) in
     norm_to_imm func_expr (fun func_imm ->
-      norm_list_to_imm args_exprs (fun args_imms -> k (Comp_app (func_imm, args_imms))))
+      norm_list_to_imm flat_args (fun args_imms -> k (Comp_app (func_imm, args_imms))))
   | Exp_if (cond, then_, Some else_) ->
     norm_to_imm cond (fun cond_imm ->
       let then_anf = norm_body then_ in

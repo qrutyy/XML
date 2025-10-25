@@ -1053,3 +1053,37 @@ let main =
       ld ra, 8(s0)
       ld s0, 0(s0)
       ret |}]
+
+
+let%expect_test "partial application func" =
+  let ast_two_arity_func = parse_str "let simplesum x y = x + y
+
+let partialapp_sum = simplesum 5
+  
+let fullsum = partialapp_sum 5
+
+let main =
+  let () = print_int (fullsum) in
+  0
+  ;;" in
+  let asm = to_asm ast_two_arity_func in
+  print_endline asm;
+  [%expect.unreachable]
+[@@expect.uncaught_exn {|
+  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
+     This is strongly discouraged as backtraces are fragile.
+     Please change this test to not include a backtrace. *)
+
+  (Failure "Unbound identifier during codegen: fullsum")
+  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
+  Called from Stdlib__List.iteri in file "list.ml" (inlined), line 114, characters 12-17
+  Called from Stdlib__List.iteri in file "list.ml", line 116, characters 16-27
+  Called from Backend__Codegen.gen_comp_expr in file "lib/backend/codegen.ml", line 116, characters 4-207
+  Called from Backend__Codegen.gen_anf_expr in file "lib/backend/codegen.ml", line 74, characters 28-63
+  Called from Backend__Codegen.gen_func in file "lib/backend/codegen.ml", line 188, characters 21-62
+  Called from Stdlib__List.iter in file "list.ml", line 110, characters 12-15
+  Called from Backend__Codegen.gen_program in file "lib/backend/codegen.ml", line 209, characters 2-350
+  Called from XML_manytests__Compiler.to_asm in file "many_tests/compiler.ml", line 13, characters 2-41
+  Called from XML_manytests__Compiler.(fun) in file "many_tests/compiler.ml", line 1069, characters 12-37
+  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  

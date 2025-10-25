@@ -33,19 +33,39 @@ module Env = struct
   let copy = Hashtbl.copy
 end
 
+module ArityMap = struct
+  type t = (ident, int) Hashtbl.t
+
+  let empty () = Hashtbl.create 16
+  let bind (t : t) (x : ident) (arity : int) = Hashtbl.replace t x arity
+  let find (t : t) (x : ident) = Hashtbl.find_opt t x
+  let copy = Hashtbl.copy
+end
+
 type cg_state =
   { env : Env.t
   ; stack_offset : int
+  ; arity : ArityMap.t
   }
 
-let gen_im_expr state dst (imm : im_expr) =
+let gen_im_expr (state : cg_state) (dst : reg) (imm : im_expr) : unit =
   match imm with
   | Imm_num n -> emit li dst n
   | Imm_ident x ->
     (match Env.find state.env x with
      | Some (Reg r) -> if not (equal_reg r dst) then emit mv dst r
      | Some (Stack_offset offset) -> emit ld dst (S 0, offset)
-     | None -> failwith ("Unbound identifier during codegen: " ^ x))
+     | None ->
+       (match ArityMap.find state.arity x with
+        | Some 0 ->
+          emit call x;
+          if not (equal_reg (A 0) dst) then emit mv dst (A 0)
+        | Some arity ->
+          emit la (A 0) x;
+          emit li (A 1) arity;
+          emit call "alloc_closure";
+          if not (equal_reg (A 0) dst) then emit mv dst (A 0)
+        | None -> failwith ("Unbound identifier during codegen: " ^ x)))
 ;;
 
 let rec gen_anf_expr state dst (aexpr : anf_expr) =
@@ -73,12 +93,6 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
     emit_bin_op op dst (T 0) (T 1);
     state
   | Comp_app (func_imm, args_imms) ->
-    let func_name =
-      match func_imm with
-      | Imm_ident name -> name
-      | Imm_num _ -> failwith "Runtime error: attempted to call a number."
-    in
-    (*live - all the variables from the env, that are now in registers (aside from fp)*)
     let live_regs_to_save =
       Hashtbl.fold
         (fun _ loc acc ->
@@ -93,14 +107,35 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
          emit addi SP SP (-Target.word_size);
          emit sd reg (SP, 0))
       live_regs_to_save;
-    List.iteri
-      (fun i arg_imm ->
-         if i < Array.length Target.arg_regs
-         then gen_im_expr state (A i) arg_imm
-         else failwith "Stack arguments not yet implemented")
-      args_imms;
-    emit call func_name;
-    emit mv (T 0) (A 0);
+    let arity1_direct =
+      match func_imm with
+      | Imm_ident name ->
+        (match ArityMap.find state.arity name with
+         | Some 1 -> Some name
+         | _ -> None)
+      | _ -> None
+    in
+    (match arity1_direct, args_imms with
+     | Some fname, first_arg :: rest_args ->
+       gen_im_expr state (A 0) first_arg;
+       emit call fname;
+       emit mv (T 0) (A 0);
+       List.iter
+         (fun arg_imm ->
+            if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
+            gen_im_expr state (A 1) arg_imm;
+            emit call "apply1";
+            emit mv (T 0) (A 0))
+         rest_args
+     | _ ->
+       gen_im_expr state (T 0) func_imm;
+       List.iter
+         (fun arg_imm ->
+            if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
+            gen_im_expr state (A 1) arg_imm;
+            emit call "apply1";
+            emit mv (T 0) (A 0))
+         args_imms);
     List.iter
       (fun reg ->
          emit ld reg (SP, 0);
@@ -123,9 +158,12 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
     state
   | Comp_func (params, body) ->
     let func_label = fresh_label "lambda" in
+    ArityMap.bind state.arity func_label (List.length params);
     deferred_functions := (func_label, params, body) :: !deferred_functions;
-    emit la dst func_label;
-    (*load address*)
+    emit la (A 0) func_label;
+    emit li (A 1) (List.length params);
+    emit call "alloc_closure";
+    if not (equal_reg dst (A 0)) then emit mv dst (A 0);
     state
   | Comp_tuple _ ->
     (* Tuples would require heap allocation.
@@ -151,7 +189,7 @@ and count_locals_in_comp (cexpr : comp_expr) : int =
     max locals_in_then locals_in_else
 ;;
 
-let gen_func func_name params body_anf ppf =
+let gen_func ~arity_map func_name params body_anf ppf =
   let env = Env.empty () in
   List.iteri
     (fun i param_name ->
@@ -161,10 +199,9 @@ let gen_func func_name params body_anf ppf =
     params;
   let local_count = count_locals_in_anf body_anf in
   let stack_size = (2 + local_count) * Target.word_size in
-  (* 2 words for ra and old fp *)
   emit_prologue func_name stack_size;
-  let initial_state = { env; stack_offset = 0 } in
-  let _final_state = gen_anf_expr initial_state (A 0) body_anf in
+  let initial_state = { env; stack_offset = 0; arity = arity_map } in
+  let _ = gen_anf_expr initial_state (A 0) body_anf in
   flush_queue ppf;
   emit_epilogue stack_size
 ;;
@@ -185,19 +222,29 @@ let gen_program ppf (program : aprogram) =
       program
   in
   if has_main then gen_start ppf;
+  let arity = ArityMap.empty () in
   List.iter
     (function
-      | Anf_str_eval anf_expr -> gen_func "main" [] anf_expr ppf
+      | Anf_str_value (_rf, name, Anf_let (_, _, Comp_func (ps, _), _)) ->
+        ArityMap.bind arity name (List.length ps)
+      | Anf_str_value (_rf, name, Anf_comp_expr (Comp_func (ps, _))) ->
+        ArityMap.bind arity name (List.length ps)
+      | _ -> ())
+    program;
+  List.iter
+    (function
+      | Anf_str_eval anf_expr -> gen_func ~arity_map:arity "main" [] anf_expr ppf
       | Anf_str_value (_rec_flag, name, anf_expr) ->
         let params, body =
           match anf_expr with
           | Anf_let (_, _, Comp_func (ps, b), _) -> ps, b
+          | Anf_comp_expr (Comp_func (ps, b)) -> ps, b
           | _ -> [], anf_expr
         in
-        gen_func name params body ppf)
+        gen_func ~arity_map:arity name params body ppf)
     program;
   List.iter
-    (fun (name, params, body) -> gen_func name params body ppf)
+    (fun (name, params, body) -> gen_func ~arity_map:arity name params body ppf)
     (List.rev !deferred_functions);
   flush_queue ppf
 ;;
