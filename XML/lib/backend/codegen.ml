@@ -92,7 +92,7 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
     gen_im_expr state (T 1) v2;
     emit_bin_op op dst (T 0) (T 1);
     state
-  | Comp_app (func_imm, args_imms) ->
+| Comp_app (func_imm, args_imms) ->
     let live_regs_to_save =
       Hashtbl.fold
         (fun _ loc acc ->
@@ -107,40 +107,71 @@ and gen_comp_expr state dst (cexpr : comp_expr) =
          emit addi SP SP (-Target.word_size);
          emit sd reg (SP, 0))
       live_regs_to_save;
-    let arity1_direct =
+    let m = List.length args_imms in
+    let fname_opt, n_opt =
       match func_imm with
-      | Imm_ident name ->
-        (match ArityMap.find state.arity name with
-         | Some 1 -> Some name
-         | _ -> None)
-      | _ -> None
+      | Imm_ident name -> (Some name, ArityMap.find state.arity name)
+      | _ -> (None, None)
     in
-    (match arity1_direct, args_imms with
-     | Some fname, first_arg :: rest_args ->
-       gen_im_expr state (A 0) first_arg;
-       emit call fname;
-       emit mv (T 0) (A 0);
-       List.iter
-         (fun arg_imm ->
-            if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
-            gen_im_expr state (A 1) arg_imm;
-            emit call "apply1";
-            emit mv (T 0) (A 0))
-         rest_args
-     | _ ->
-       gen_im_expr state (T 0) func_imm;
-       List.iter
-         (fun arg_imm ->
-            if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
-            gen_im_expr state (A 1) arg_imm;
-            emit call "apply1";
-            emit mv (T 0) (A 0))
-         args_imms);
+    begin match fname_opt, n_opt with
+    | Some fname, Some n ->
+      (*сразу вызываем чтобы не плодить closure*)
+        if m = n then (
+          List.iteri
+            (fun i arg_imm ->
+               if i < Array.length Target.arg_regs
+               then gen_im_expr state (A i) arg_imm
+               else failwith "Stack arguments for direct call not implemented")
+            args_imms;
+          emit call fname;
+          emit mv (T 0) (A 0)
+        ) else if m < n then (
+          (*создаем замыкание если передано меньше аргументов*)
+          emit la (A 0) fname;
+          emit li (A 1) n;
+          emit call "alloc_closure";
+          emit mv (T 0) (A 0);
+          List.iter
+            (fun arg_imm ->
+               if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
+               gen_im_expr state (A 1) arg_imm;
+               emit call "apply1";
+               emit mv (T 0) (A 0))
+            args_imms
+        ) else (
+          (*если больше аргументов - я считаю ошибка но стоит подумать могут ли быть другие случаи*)
+          failwith
+            (Printf.sprintf
+               "Too many arguments for function %s: expected %d, got %d"
+               fname n m)
+        )
+
+    | Some fname, None ->
+        List.iteri
+          (fun i arg_imm ->
+             if i < Array.length Target.arg_regs
+             then gen_im_expr state (A i) arg_imm
+             else failwith "Stack arguments for external calls not implemented")
+          args_imms;
+        emit call fname;
+        emit mv (T 0) (A 0)
+
+    | _ ->
+        gen_im_expr state (T 0) func_imm;
+        List.iter
+          (fun arg_imm ->
+             if not (equal_reg (A 0) (T 0)) then emit mv (A 0) (T 0);
+             gen_im_expr state (A 1) arg_imm;
+             emit call "apply1";
+             emit mv (T 0) (A 0))
+          args_imms
+    end;
     List.iter
       (fun reg ->
          emit ld reg (SP, 0);
          emit addi SP SP Target.word_size)
       (List.rev live_regs_to_save);
+
     if not (equal_reg dst (T 0)) then emit mv dst (T 0);
     state
   | Comp_branch (cond_imm, then_anf, else_anf) ->
