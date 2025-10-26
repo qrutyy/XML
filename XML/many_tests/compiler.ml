@@ -501,8 +501,8 @@ let main =
       sd t0, -32(s0)
       ld t0, -32(s0)
     endif_1:
-      sd t0, -16(s0)
-      ld a0, -16(s0)
+      sd t0, -40(s0)
+      ld a0, -40(s0)
       addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
@@ -588,8 +588,8 @@ let main =
       sd t0, -32(s0)
       ld t0, -32(s0)
     endif_1:
-      sd t0, -16(s0)
-      ld a0, -16(s0)
+      sd t0, -40(s0)
+      ld a0, -40(s0)
       addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
@@ -665,8 +665,8 @@ let%expect_test "factorial_basic_codegen" =
       sd t0, -32(s0)
       ld t0, -32(s0)
     endif_1:
-      sd t0, -16(s0)
-      ld a0, -16(s0)
+      sd t0, -40(s0)
+      ld a0, -40(s0)
       addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
@@ -728,11 +728,11 @@ let%expect_test "ifs" =
       mv t0, a0
       ld a0, 0(sp)
       addi sp, sp, 8
-      sd t0, -16(s0)
-      ld t0, -16(s0)
+      sd t0, -24(s0)
+      ld t0, -24(s0)
     endif_1:
-      sd t0, -16(s0)
-      ld a0, -16(s0)
+      sd t0, -32(s0)
+      ld a0, -32(s0)
       addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
@@ -757,32 +757,32 @@ let%expect_test "ifs" =
       sd t0, -8(s0)
       li t0, 1
     endif_3:
-      sd t0, -8(s0)
-      ld t0, -8(s0)
+      sd t0, -16(s0)
+      ld t0, -16(s0)
       beq t0, zero, else_4
       li t0, 0
       j endif_5
     else_4:
       li t0, 1
     endif_5:
-      sd t0, -16(s0)
-      ld t0, -16(s0)
+      sd t0, -24(s0)
+      ld t0, -24(s0)
       beq t0, zero, else_6
       li t0, 0
       j endif_7
     else_6:
       li t0, 1
     endif_7:
-      sd t0, -24(s0)
-      ld t0, -24(s0)
+      sd t0, -32(s0)
+      ld t0, -32(s0)
       addi sp, sp, -8
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
       call large
       mv t0, a0
-      sd t0, -32(s0)
-      ld a0, -32(s0)
+      sd t0, -40(s0)
+      ld a0, -40(s0)
       addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
@@ -843,11 +843,11 @@ let%expect_test "ifs" =
       mv t0, a0
       ld a0, 0(sp)
       addi sp, sp, 8
-      sd t0, -16(s0)
-      ld t0, -16(s0)
+      sd t0, -24(s0)
+      ld t0, -24(s0)
     endif_1:
-      sd t0, -16(s0)
-      ld a0, -16(s0)
+      sd t0, -32(s0)
+      ld a0, -32(s0)
       addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
@@ -872,32 +872,32 @@ let%expect_test "ifs" =
       sd t0, -8(s0)
       li t0, 1
     endif_3:
-      sd t0, -8(s0)
-      ld t0, -8(s0)
+      sd t0, -16(s0)
+      ld t0, -16(s0)
       beq t0, zero, else_4
       li t0, 0
       j endif_5
     else_4:
       li t0, 1
     endif_5:
-      sd t0, -16(s0)
-      ld t0, -16(s0)
+      sd t0, -24(s0)
+      ld t0, -24(s0)
       beq t0, zero, else_6
       li t0, 0
       j endif_7
     else_6:
       li t0, 1
     endif_7:
-      sd t0, -24(s0)
-      ld t0, -24(s0)
+      sd t0, -32(s0)
+      ld t0, -32(s0)
       addi sp, sp, -8
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
       call large
       mv t0, a0
-      sd t0, -32(s0)
-      ld a0, -32(s0)
+      sd t0, -40(s0)
+      ld a0, -40(s0)
       addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)
@@ -970,8 +970,8 @@ let main =
       sd t0, -48(s0)
       ld t0, -48(s0)
     endif_1:
-      sd t0, -16(s0)
-      ld a0, -16(s0)
+      sd t0, -56(s0)
+      ld a0, -56(s0)
       addi sp, s0, 16
       ld ra, 8(s0)
       ld s0, 0(s0)

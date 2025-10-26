@@ -44,8 +44,8 @@
     sd t0, -32(s0)
     ld t0, -32(s0)
   endif_1:
-    sd t0, -16(s0)
-    ld a0, -16(s0)
+    sd t0, -40(s0)
+    ld a0, -40(s0)
     addi sp, s0, 16
     ld ra, 8(s0)
     ld s0, 0(s0)
@@ -145,8 +145,8 @@
     sd t0, -48(s0)
     ld t0, -48(s0)
   endif_1:
-    sd t0, -16(s0)
-    ld a0, -16(s0)
+    sd t0, -56(s0)
+    ld a0, -56(s0)
     addi sp, s0, 16
     ld ra, 8(s0)
     ld s0, 0(s0)
@@ -235,11 +235,11 @@
     mv t0, a0
     ld a0, 0(sp)
     addi sp, sp, 8
-    sd t0, -16(s0)
-    ld t0, -16(s0)
+    sd t0, -24(s0)
+    ld t0, -24(s0)
   endif_1:
-    sd t0, -16(s0)
-    ld a0, -16(s0)
+    sd t0, -32(s0)
+    ld a0, -32(s0)
     addi sp, s0, 16
     ld ra, 8(s0)
     ld s0, 0(s0)
@@ -271,45 +271,45 @@
     addi sp, sp, 8
     call print_int
     mv t0, a0
-    sd t0, -16(s0)
+    sd t0, -24(s0)
     li t0, 1
     li t1, 1
     xor t0, t0, t1
     seqz t0, t0
-    sd t0, -24(s0)
-    ld t0, -24(s0)
+    sd t0, -32(s0)
+    ld t0, -32(s0)
   endif_3:
-    sd t0, -16(s0)
-    ld t0, -16(s0)
+    sd t0, -40(s0)
+    ld t0, -40(s0)
     beq t0, zero, else_4
     li t0, 0
     j endif_5
   else_4:
     li t0, 1
   endif_5:
-    sd t0, -24(s0)
-    ld t0, -24(s0)
+    sd t0, -48(s0)
+    ld t0, -48(s0)
     li t1, 1
     xor t0, t0, t1
     seqz t0, t0
-    sd t0, -32(s0)
-    ld t0, -32(s0)
+    sd t0, -56(s0)
+    ld t0, -56(s0)
     beq t0, zero, else_6
     li t0, 0
     j endif_7
   else_6:
     li t0, 1
   endif_7:
-    sd t0, -40(s0)
-    ld t0, -40(s0)
+    sd t0, -64(s0)
+    ld t0, -64(s0)
     addi sp, sp, -8
     sd t0, 0(sp)
     ld a0, 0(sp)
     addi sp, sp, 8
     call large
     mv t0, a0
-    sd t0, -48(s0)
-    ld a0, -48(s0)
+    sd t0, -72(s0)
+    ld a0, -72(s0)
     addi sp, s0, 16
     ld ra, 8(s0)
     ld s0, 0(s0)
@@ -486,7 +486,7 @@
     mv t0, a0
     li t1, 1
     sub t0, t0, t1
-    sd t0, -16(s0)
+    sd t0, -24(s0)
     addi sp, sp, -8
     sd a0, 0(sp)
     addi sp, sp, -8
@@ -515,15 +515,15 @@
     addi sp, sp, 8
     ld a0, 0(sp)
     addi sp, sp, 8
-    sd t0, -24(s0)
+    sd t0, -32(s0)
     addi sp, sp, -8
     sd a0, 0(sp)
     addi sp, sp, -8
     sd a1, 0(sp)
-    ld t0, -24(s0)
+    ld t0, -32(s0)
     addi sp, sp, -8
     sd t0, 0(sp)
-    ld t0, -16(s0)
+    ld t0, -24(s0)
     addi sp, sp, -8
     sd t0, 0(sp)
     ld a0, 0(sp)
@@ -536,11 +536,11 @@
     addi sp, sp, 8
     ld a0, 0(sp)
     addi sp, sp, 8
-    sd t0, -32(s0)
-    ld t0, -32(s0)
+    sd t0, -40(s0)
+    ld t0, -40(s0)
   endif_1:
-    sd t0, -16(s0)
-    ld a0, -16(s0)
+    sd t0, -48(s0)
+    ld a0, -48(s0)
     addi sp, s0, 16
     ld ra, 8(s0)
     ld s0, 0(s0)
@@ -611,9 +611,9 @@
     add t0, t0, t1
     sd t0, -8(s0)
     addi sp, sp, -8
-    sd a0, 0(sp)
-    addi sp, sp, -8
     sd a2, 0(sp)
+    addi sp, sp, -8
+    sd a0, 0(sp)
     addi sp, sp, -8
     sd a1, 0(sp)
     mv t0, a1
@@ -624,9 +624,9 @@
     mv t0, a0
     ld a1, 0(sp)
     addi sp, sp, 8
-    ld a2, 0(sp)
-    addi sp, sp, 8
     ld a0, 0(sp)
+    addi sp, sp, 8
+    ld a2, 0(sp)
     addi sp, sp, 8
     sd t0, -16(s0)
     ld a0, -16(s0)
@@ -646,11 +646,11 @@
     addi sp, sp, -8
     sd a3, 0(sp)
     addi sp, sp, -8
-    sd a2, 0(sp)
-    addi sp, sp, -8
     sd a0, 0(sp)
     addi sp, sp, -8
     sd a1, 0(sp)
+    addi sp, sp, -8
+    sd a2, 0(sp)
     addi sp, sp, -16
     mv t1, a3
     sd t1, 0(sp)
@@ -671,11 +671,11 @@
     call apply1
     mv t0, a0
     addi sp, sp, 16
+    ld a2, 0(sp)
+    addi sp, sp, 8
     ld a1, 0(sp)
     addi sp, sp, 8
     ld a0, 0(sp)
-    addi sp, sp, 8
-    ld a2, 0(sp)
     addi sp, sp, 8
     ld a3, 0(sp)
     addi sp, sp, 8
@@ -683,11 +683,11 @@
     addi sp, sp, -8
     sd a3, 0(sp)
     addi sp, sp, -8
-    sd a2, 0(sp)
-    addi sp, sp, -8
     sd a0, 0(sp)
     addi sp, sp, -8
     sd a1, 0(sp)
+    addi sp, sp, -8
+    sd a2, 0(sp)
     mv t0, a2
     ld t1, -8(s0)
     mv a0, t0
@@ -699,11 +699,11 @@
     mv a1, t1
     call apply1
     mv t0, a0
+    ld a2, 0(sp)
+    addi sp, sp, 8
     ld a1, 0(sp)
     addi sp, sp, 8
     ld a0, 0(sp)
-    addi sp, sp, 8
-    ld a2, 0(sp)
     addi sp, sp, 8
     ld a3, 0(sp)
     addi sp, sp, 8
@@ -745,7 +745,7 @@
     mv t0, a0
     li t1, 1
     sub t0, t0, t1
-    sd t0, -16(s0)
+    sd t0, -24(s0)
     addi sp, sp, -8
     sd a0, 0(sp)
     addi sp, sp, -8
@@ -784,15 +784,15 @@
     addi sp, sp, 8
     ld a0, 0(sp)
     addi sp, sp, 8
-    sd t0, -24(s0)
+    sd t0, -32(s0)
     addi sp, sp, -8
     sd a0, 0(sp)
     addi sp, sp, -8
     sd a1, 0(sp)
-    ld t0, -24(s0)
+    ld t0, -32(s0)
     addi sp, sp, -8
     sd t0, 0(sp)
-    ld t0, -16(s0)
+    ld t0, -24(s0)
     addi sp, sp, -8
     sd t0, 0(sp)
     ld a0, 0(sp)
@@ -805,11 +805,11 @@
     addi sp, sp, 8
     ld a0, 0(sp)
     addi sp, sp, 8
-    sd t0, -32(s0)
-    ld t0, -32(s0)
+    sd t0, -40(s0)
+    ld t0, -40(s0)
   endif_1:
-    sd t0, -16(s0)
-    ld a0, -16(s0)
+    sd t0, -48(s0)
+    ld a0, -48(s0)
     addi sp, s0, 16
     ld ra, 8(s0)
     ld s0, 0(s0)
