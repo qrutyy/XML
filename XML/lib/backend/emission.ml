@@ -43,7 +43,7 @@ module Emission = struct
       emit xor temp r1 r2;
       (* temp = 0 if r1 == r2, non-zero otherwise *)
       emit snez rd temp (* dst = 1 if temp != 0, else 0 *)
-    | _ -> failwith ("Unknown binary operator: " ^ op)
+    | _ -> invalid_arg ("Unknown binary operator: " ^ op)
   ;;
 
   (*миша я переписал через емит чтобы у нас вся оработка шла черз один модуль*)

@@ -9,8 +9,6 @@ open Target
 open Machine
 open Emission.Emission
 
-let label_counter = ref 0
-
 type loc =
   | Reg of reg
   | Stack_offset of int
@@ -20,13 +18,10 @@ module Env = struct
 
   type t = loc M.t
 
-  let empty : unit -> t = fun () -> M.empty
+  let empty () : t = M.empty
   let bind (t : t) (x : string) (loc : loc) : t = M.add x loc t
   let find (t : t) (x : string) : loc option = M.find_opt x t
-
-  let fold (f : string -> loc -> 'a -> 'a) (t : t) (acc : 'a) : 'a =
-    M.fold (fun k v acc -> f k v acc) t acc
-  ;;
+  let fold (f : string -> loc -> 'a -> 'a) (t : t) (acc : 'a) : 'a = M.fold f t acc
 end
 
 module ArityMap = struct
@@ -40,7 +35,7 @@ module ArityMap = struct
 
   type t = int M.t
 
-  let empty : unit -> t = fun () -> M.empty
+  let empty () : t = M.empty
   let bind (t : t) (x : ident) (arity : int) : t = M.add x arity t
   let find (t : t) (x : ident) : int option = M.find_opt x t
 end
@@ -53,35 +48,60 @@ type cg_state =
   ; deferred : (string * ident list * anf_expr) list
   }
 
+type cg_error =
+  [ `Unbound_identifier of string
+  | `Stack_args_not_impl_direct
+  | `Stack_args_not_impl_external
+  | `Too_many_args of string * int * int
+  | `Call_non_function
+  | `Tuple_not_impl
+  | `Too_many_reg_params
+  ]
+
+type 'a r = ('a, cg_error) result
+
+let ok x = Ok x
+let err e = Error e
+let ( let* ) = Result.bind
+let ( let+ ) x f = Result.map f x
+
 let fresh_label (prefix : string) (st : cg_state) : string * cg_state =
   let n = st.next_label in
   prefix ^ "_" ^ string_of_int n, { st with next_label = n + 1 }
 ;;
 
-let gen_im_expr (state : cg_state) (dst : reg) (imm : im_expr) : unit =
+let gen_im_expr (state : cg_state) (dst : reg) (imm : im_expr) : unit r =
   match imm with
-  | Imm_num n -> emit li dst n
+  | Imm_num n ->
+    emit li dst n;
+    ok ()
   | Imm_ident x ->
     (match Env.find state.env x with
-     | Some (Reg r) -> if not (equal_reg r dst) then emit mv dst r
-     | Some (Stack_offset offset) -> emit ld dst (S 0, offset)
+     | Some (Reg r) ->
+       if not (equal_reg r dst) then emit mv dst r;
+       ok ()
+     | Some (Stack_offset offset) ->
+       emit ld dst (S 0, offset);
+       ok ()
      | None ->
        (match ArityMap.find state.arity x with
         | Some 0 ->
           emit call x;
-          if not (equal_reg (A 0) dst) then emit mv dst (A 0)
+          if not (equal_reg (A 0) dst) then emit mv dst (A 0);
+          ok ()
         | Some arity ->
           emit la (A 0) x;
           emit li (A 1) arity;
           emit call "alloc_closure";
-          if not (equal_reg (A 0) dst) then emit mv dst (A 0)
-        | None -> failwith ("Unbound identifier during codegen: " ^ x)))
+          if not (equal_reg (A 0) dst) then emit mv dst (A 0);
+          ok ()
+        | None -> err (`Unbound_identifier x)))
 ;;
 
-let rec gen_anf_expr (state : cg_state) (dst : reg) (aexpr : anf_expr) : cg_state =
+let rec gen_anf_expr (state : cg_state) (dst : reg) (aexpr : anf_expr) : cg_state r =
   match aexpr with
   | Anf_let (_rec_flag, name, comp_expr, body) ->
-    let state_after_cexpr = gen_comp_expr state (T 0) comp_expr in
+    let* state_after_cexpr = gen_comp_expr state (T 0) comp_expr in
     let new_offset = state_after_cexpr.stack_offset - Target.word_size in
     emit sd (T 0) (S 0, new_offset);
     let env' = Env.bind state_after_cexpr.env name (Stack_offset new_offset) in
@@ -89,16 +109,16 @@ let rec gen_anf_expr (state : cg_state) (dst : reg) (aexpr : anf_expr) : cg_stat
     gen_anf_expr new_state dst body
   | Anf_comp_expr comp_expr -> gen_comp_expr state dst comp_expr
 
-and gen_comp_expr (state : cg_state) (dst : reg) (cexpr : comp_expr) : cg_state =
+and gen_comp_expr (state : cg_state) (dst : reg) (cexpr : comp_expr) : cg_state r =
   match cexpr with
   | Comp_imm imm ->
-    gen_im_expr state dst imm;
-    state
+    let* () = gen_im_expr state dst imm in
+    ok state
   | Comp_binop (op, v1, v2) ->
-    gen_im_expr state (T 0) v1;
-    gen_im_expr state (T 1) v2;
+    let* () = gen_im_expr state (T 0) v1 in
+    let* () = gen_im_expr state (T 1) v2 in
     emit_bin_op op dst (T 0) (T 1);
-    state
+    ok state
   | Comp_app (func_imm, args_imms) ->
     (* сохранить живые регистры *)
     let live_regs_to_save =
@@ -116,105 +136,110 @@ and gen_comp_expr (state : cg_state) (dst : reg) (cexpr : comp_expr) : cg_state 
          emit sd reg (SP, 0))
       live_regs_to_save;
     let argc = List.length args_imms in
-    let apply_chain () =
-      List.iter
-        (fun arg_imm ->
-           gen_im_expr state (T 1) arg_imm;
-           emit mv (A 0) (T 0);
-           emit mv (A 1) (T 1);
-           emit call "apply1";
-           emit mv (T 0) (A 0))
-        args_imms
+    let apply_chain () : unit r =
+      let rec loop = function
+        | [] -> ok ()
+        | arg_imm :: tl ->
+          let* () = gen_im_expr state (T 1) arg_imm in
+          emit mv (A 0) (T 0);
+          emit mv (A 1) (T 1);
+          emit call "apply1";
+          emit mv (T 0) (A 0);
+          loop tl
+      in
+      loop args_imms
     in
-    let state =
+    let* state =
       match func_imm with
       | Imm_ident fname ->
         (match Env.find state.env fname with
          | Some _ ->
            (* замыкание из окружения *)
-           gen_im_expr state (T 0) func_imm;
-           apply_chain ();
-           state
+           let* () = gen_im_expr state (T 0) func_imm in
+           let* () = apply_chain () in
+           ok state
          | None ->
            (match ArityMap.find state.arity fname with
             | Some n when n = 0 ->
               emit call fname;
               emit mv (T 0) (A 0);
-              apply_chain ();
-              state
-            | Some n ->
-              if argc = n
-              then (
-                (* аргументов хватает - делаем вызов сразу*)
-                List.iter
-                  (fun arg_imm ->
-                     gen_im_expr state (T 0) arg_imm;
-                     emit addi SP SP (-Target.word_size);
-                     emit sd (T 0) (SP, 0))
-                  (List.rev args_imms);
-                List.iteri
-                  (fun i _ ->
-                     if i < Array.length Target.arg_regs
-                     then (
-                       emit ld (A i) (SP, 0);
-                       emit addi SP SP Target.word_size)
-                     else failwith "Stack arguments for direct call not implemented")
-                  args_imms;
-                emit call fname;
-                emit mv (T 0) (A 0);
-                state)
-              else if argc < n
-              then (
-                (* частичное применение если аргументов меньше чем надо, в будущем чуть придется поравить чтобы создавать одно замыканние а не много*)
-                let m = argc in
-                if m > 0 then emit addi SP SP (-m * Target.word_size);
-                List.iteri
-                  (fun i arg_imm ->
-                     gen_im_expr state (T 1) arg_imm;
-                     emit sd (T 1) (SP, i * Target.word_size))
-                  args_imms;
-                emit la (A 0) fname;
-                emit li (A 1) n;
-                emit call "alloc_closure";
-                emit mv (T 0) (A 0);
-                List.iteri
-                  (fun i _ ->
-                     emit ld (T 1) (SP, i * Target.word_size);
-                     emit mv (A 0) (T 0);
-                     emit mv (A 1) (T 1);
-                     emit call "apply1";
-                     emit mv (T 0) (A 0))
-                  args_imms;
-                if m > 0 then emit addi SP SP (m * Target.word_size);
-                state)
-              else
-                (*  тут пока падаем тк переданно много аргументов - мб в будущем откажемся от этой идеи но пока я не вижу сценария где функция с арность n может принять n+1 аргмент*)
-                failwith
-                  (Printf.sprintf
-                     "Too many arguments for function %s: expected %d, got %d"
-                     fname
-                     n
-                     argc)
+              let* () = apply_chain () in
+              ok state
+            | Some n when argc = n ->
+              (* аргументов хватает - делаем вызов сразу*)
+              List.iter
+                (fun arg_imm ->
+                   let () =
+                     let _ = () in
+                     ()
+                   in
+                   emit addi SP SP (-Target.word_size);
+                   let (_ : unit r) = gen_im_expr state (T 0) arg_imm in
+                   emit sd (T 0) (SP, 0))
+                (List.rev args_imms);
+              let rec load_args i = function
+                | [] -> ok ()
+                | _ :: tl when i < Array.length Target.arg_regs ->
+                  emit ld (A i) (SP, 0);
+                  emit addi SP SP Target.word_size;
+                  load_args (i + 1) tl
+                | _ -> err `Stack_args_not_impl_direct
+              in
+              let* () = load_args 0 args_imms in
+              emit call fname;
+              emit mv (T 0) (A 0);
+              ok state
+            | Some n when argc < n ->
+              (* частичное применение если аргументов меньше чем надо, в будущем чуть придется поравить чтобы создавать одно замыканние а не много*)
+              let m = argc in
+              if m > 0 then emit addi SP SP (-m * Target.word_size);
+              let rec save_args i = function
+                | [] -> ok ()
+                | arg_imm :: tl ->
+                  let* () = gen_im_expr state (T 1) arg_imm in
+                  emit sd (T 1) (SP, i * Target.word_size);
+                  save_args (i + 1) tl
+              in
+              let* () = save_args 0 args_imms in
+              emit la (A 0) fname;
+              emit li (A 1) n;
+              emit call "alloc_closure";
+              emit mv (T 0) (A 0);
+              let rec apply_saved i = function
+                | [] -> ok ()
+                | _ :: tl ->
+                  emit ld (T 1) (SP, i * Target.word_size);
+                  emit mv (A 0) (T 0);
+                  emit mv (A 1) (T 1);
+                  emit call "apply1";
+                  emit mv (T 0) (A 0);
+                  apply_saved (i + 1) tl
+              in
+              let* () = apply_saved 0 args_imms in
+              if m > 0 then emit addi SP SP (m * Target.word_size);
+              ok state
+            | Some n -> err (`Too_many_args (fname, n, argc))
             | None ->
               (* внешняя функция для того чтобы не было ошибки с вызовом рантайма *)
               List.iter
                 (fun arg_imm ->
-                   gen_im_expr state (T 0) arg_imm;
+                   let (_ : unit r) = gen_im_expr state (T 0) arg_imm in
                    emit addi SP SP (-Target.word_size);
                    emit sd (T 0) (SP, 0))
                 (List.rev args_imms);
-              List.iteri
-                (fun i _ ->
-                   if i < Array.length Target.arg_regs
-                   then (
-                     emit ld (A i) (SP, 0);
-                     emit addi SP SP Target.word_size)
-                   else failwith "Stack arguments for external calls not implemented")
-                args_imms;
+              let rec load_args i = function
+                | [] -> ok ()
+                | _ :: tl when i < Array.length Target.arg_regs ->
+                  emit ld (A i) (SP, 0);
+                  emit addi SP SP Target.word_size;
+                  load_args (i + 1) tl
+                | _ -> err `Stack_args_not_impl_external
+              in
+              let* () = load_args 0 args_imms in
               emit call fname;
               emit mv (T 0) (A 0);
-              state))
-      | Imm_num _ -> failwith "Runtime error: attempted to call a number."
+              ok state))
+      | Imm_num _ -> err `Call_non_function
     in
     List.iter
       (fun reg ->
@@ -222,18 +247,18 @@ and gen_comp_expr (state : cg_state) (dst : reg) (cexpr : comp_expr) : cg_state 
          emit addi SP SP Target.word_size)
       (List.rev live_regs_to_save);
     if not (equal_reg dst (T 0)) then emit mv dst (T 0);
-    state
+    ok state
   | Comp_branch (cond_imm, then_anf, else_anf) ->
+    let* () = gen_im_expr state (T 0) cond_imm in
     let lbl_else, state = fresh_label "else" state in
     let lbl_end, state = fresh_label "endif" state in
-    gen_im_expr state (T 0) cond_imm;
     emit beq (T 0) Zero lbl_else;
-    let state_then = gen_anf_expr state dst then_anf in
+    let* state_then = gen_anf_expr state dst then_anf in
     emit j lbl_end;
     emit label lbl_else;
-    let state_else = gen_anf_expr state_then dst else_anf in
+    let* state_else = gen_anf_expr state_then dst else_anf in
     emit label lbl_end;
-    state_else
+    ok state_else
   | Comp_func (params, body) ->
     (* создаём уникальный ярлык функции, добавляем в deferred *)
     let func_label, state = fresh_label "lambda" state in
@@ -248,8 +273,8 @@ and gen_comp_expr (state : cg_state) (dst : reg) (cexpr : comp_expr) : cg_state 
     emit li (A 1) (List.length params);
     emit call "alloc_closure";
     if not (equal_reg dst (A 0)) then emit mv dst (A 0);
-    state
-  | Comp_tuple _ -> failwith "Tuple values are not yet implemented"
+    ok state
+  | Comp_tuple _ -> err `Tuple_not_impl
 ;;
 
 (* counts the number of let bindings to allocate space on stack *)
@@ -277,33 +302,26 @@ let gen_func
       (body_anf : anf_expr)
       ppf
       (st : cg_state)
-  : cg_state
+  : cg_state r
   =
-  let env_params =
+  let env_params_res =
     let rec go i env = function
-      | [] -> env
-      | p :: ps ->
-        if i < Array.length Target.arg_regs
-        then go (i + 1) (Env.bind env p (Reg (A i))) ps
-        else failwith "Too many arguments for register passing"
+      | [] -> ok env
+      | p :: ps when i < Array.length Target.arg_regs ->
+        go (i + 1) (Env.bind env p (Reg (A i))) ps
+      | _ -> err `Too_many_reg_params
     in
     go 0 (Env.empty ()) params
   in
+  let* env_params = env_params_res in
   let local_count = count_locals_in_anf body_anf in
   let stack_size = (2 + local_count) * Target.word_size in
   emit_prologue func_name stack_size;
-  let local_state =
-    { env = env_params
-    ; stack_offset = 0
-    ; arity = arity_map
-    ; next_label = st.next_label
-    ; deferred = st.deferred
-    }
-  in
-  let state_after = gen_anf_expr local_state (A 0) body_anf in
+  let local_state = { st with env = env_params; stack_offset = 0; arity = arity_map } in
+  let* state_after = gen_anf_expr local_state (A 0) body_anf in
   flush_queue ppf;
   emit_epilogue stack_size;
-  { st with next_label = state_after.next_label; deferred = state_after.deferred }
+  ok { st with next_label = state_after.next_label; deferred = state_after.deferred }
 ;;
 
 let gen_start ppf =
@@ -325,7 +343,7 @@ let prefill_arities (arity_map0 : ArityMap.t) (program : aprogram) : ArityMap.t 
     program
 ;;
 
-let gen_program ppf (program : aprogram) =
+let gen_program_res ppf (program : aprogram) : unit r =
   let has_main =
     List.exists
       (function
@@ -343,9 +361,11 @@ let gen_program ppf (program : aprogram) =
     ; deferred = []
     }
   in
-  let st1 =
+  let* st1 =
     List.fold_left
-      (fun st -> function
+      (fun acc_res item ->
+         let* st = acc_res in
+         match item with
          | Anf_str_eval anf_expr -> gen_func ~arity_map "main" [] anf_expr ppf st
          | Anf_str_value (_rec_flag, name, anf_expr) ->
            let params, body =
@@ -355,22 +375,46 @@ let gen_program ppf (program : aprogram) =
              | _ -> [], anf_expr
            in
            gen_func ~arity_map name params body ppf st)
-      st0
+      (ok st0)
       program
   in
   let rec drain st =
     match st.deferred with
-    | [] -> st
+    | [] -> ok st
     | defs ->
       let st' = { st with deferred = [] } in
-      let st'' =
+      let* st'' =
         List.fold_left
-          (fun st (name, ps, body) -> gen_func ~arity_map name ps body ppf st)
-          st'
+          (fun acc_res (name, ps, body) ->
+             let* st_acc = acc_res in
+             gen_func ~arity_map name ps body ppf st_acc)
+          (ok st')
           (List.rev defs)
       in
       drain st''
   in
-  let _st_final = drain st1 in
-  flush_queue ppf
+  let* _st_final = drain st1 in
+  flush_queue ppf;
+  ok ()
+;;
+
+let gen_program ppf (program : aprogram) =
+  match gen_program_res ppf program with
+  | Ok () -> ()
+  | Error (`Unbound_identifier x) ->
+    invalid_arg ("Unbound identifier during codegen: " ^ x)
+  | Error `Stack_args_not_impl_direct ->
+    invalid_arg "Stack arguments for direct call not implemented"
+  | Error `Stack_args_not_impl_external ->
+    invalid_arg "Stack arguments for external calls not implemented"
+  | Error (`Too_many_args (fname, expected, got)) ->
+    invalid_arg
+      (Printf.sprintf
+         "Too many arguments for function %s: expected %d, got %d"
+         fname
+         expected
+         got)
+  | Error `Call_non_function -> invalid_arg "Runtime error: attempted to call a number."
+  | Error `Tuple_not_impl -> invalid_arg "Tuple values are not yet implemented"
+  | Error `Too_many_reg_params -> invalid_arg "Too many arguments for register passing"
 ;;

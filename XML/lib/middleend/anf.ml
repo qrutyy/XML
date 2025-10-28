@@ -31,7 +31,37 @@ type astructure_item =
 
 type aprogram = astructure_item list
 
-(* ---------- helpers ---------- *)
+type anf_error =
+  [ `Only_simple_var_params
+  | `Func_no_params
+  | `Let_and_not_supported
+  | `Unsupported_let_pattern of string
+  | `Unsupported_expr_in_normaliser
+  | `Mutual_rec_not_supported
+  | `Unsupported_toplevel_let
+  | `Unsupported_toplevel_item
+  ]
+
+type 'a r = ('a, anf_error) result
+
+let ( let* ) = Result.bind
+let ( let+ ) x f = Result.map f x
+let ok x = Ok x
+let err e = Error e
+
+let pp_anf_error = function
+  | `Only_simple_var_params ->
+    "Only simple variable patterns are allowed in function parameters"
+  | `Func_no_params -> "Function with no parameters found"
+  | `Let_and_not_supported -> "let ... and ... is not supported in ANF yet"
+  | `Unsupported_let_pattern s -> "Unsupported pattern in let-binding: " ^ s
+  | `Unsupported_expr_in_normaliser -> "unsupported expression in ANF normaliser"
+  | `Mutual_rec_not_supported ->
+    "Mutually recursive let ... and ... bindings are not supported yet."
+  | `Unsupported_toplevel_let ->
+    "Unsupported pattern in a top-level let-binding. Only simple variables are allowed."
+  | `Unsupported_toplevel_item -> "Unsupported top-level structure item."
+;;
 
 let normalise_const = function
   | Const_integer e -> Imm_num e
@@ -46,16 +76,26 @@ let flatten_arg_expr e =
 ;;
 
 let pat_vars = function
-  | Pattern.Pat_var p -> [ p ]
-  | _ -> failwith "Only simple variable patterns are allowed in function parameters"
+  | Pattern.Pat_var p -> ok [ p ]
+  | _ -> err `Only_simple_var_params
 ;;
 
 let rec collect_params_and_body expr acc =
   match expr with
   | Exp_fun ((first_pat, rest_pats), body) ->
-    let vars = pat_vars first_pat @ List.concat_map pat_vars rest_pats in
-    collect_params_and_body body (acc @ vars)
-  | _ -> acc, expr
+    let* v1 = pat_vars first_pat in
+    let* vrest =
+      let rec go acc = function
+        | [] -> ok (List.rev acc)
+        | p :: tl ->
+          let* vs = pat_vars p in
+          go (List.rev_append vs acc) tl
+      in
+      go [] rest_pats
+    in
+    let* res = collect_params_and_body body (acc @ v1 @ vrest) in
+    ok res
+  | _ -> ok (acc, expr)
 ;;
 
 type nstate = { next : int }
@@ -67,8 +107,8 @@ let fresh (st : nstate) : ident * nstate =
   name, { next = st.next + 1 }
 ;;
 
-let rec norm_comp expr (k : comp_expr -> nstate -> anf_expr * nstate) (st : nstate)
-  : anf_expr * nstate
+let rec norm_comp expr (k : comp_expr -> nstate -> (anf_expr * nstate) r) (st : nstate)
+  : (anf_expr * nstate) r
   =
   match expr with
   | Exp_ident e -> k (Comp_imm (Imm_ident e)) st
@@ -82,6 +122,7 @@ let rec norm_comp expr (k : comp_expr -> nstate -> anf_expr * nstate) (st : nsta
       expr1
       (fun v1 ->
          norm_to_imm expr2 (fun v2 ->
+           fun st ->
            let ce =
              match v1, v2 with
              | Imm_num n1, Imm_num n2 ->
@@ -92,7 +133,7 @@ let rec norm_comp expr (k : comp_expr -> nstate -> anf_expr * nstate) (st : nsta
                 | _ -> Comp_binop (op, v1, v2))
              | _ -> Comp_binop (op, v1, v2)
            in
-           k ce))
+           k ce st))
       st
   | Exp_apply (_, _) ->
     let rec collect_args_and_func expr acc =
@@ -111,22 +152,25 @@ let rec norm_comp expr (k : comp_expr -> nstate -> anf_expr * nstate) (st : nsta
   | Exp_if (cond, then_, Some else_) ->
     norm_to_imm
       cond
-      (fun cond_imm st ->
-         let then_anf, st1 = norm_body then_ st in
-         let else_anf, st2 = norm_body else_ st1 in
+      (fun cond_imm ->
+         fun st ->
+         let* then_anf, st1 = norm_body then_ st in
+         let* else_anf, st2 = norm_body else_ st1 in
          k (Comp_branch (cond_imm, then_anf, else_anf)) st2)
       st
   | Exp_fun _ ->
-    let params, body = collect_params_and_body expr [] in
+    let* params, body = collect_params_and_body expr [] in
     (match params with
-     | [] -> failwith "Function with no parameters found"
+     | [] -> err `Func_no_params
      | _ ->
-       let body_anf, st' = norm_body body st in
+       let* body_anf, st' = norm_body body st in
        k (Comp_func (params, body_anf)) st')
   | Exp_let (rec_flag, (first_binding, other_bindings), body) ->
-    (match other_bindings with
-     | [] -> ()
-     | _ -> failwith "`let ... and ...` is not supported in ANF yet");
+    let* () =
+      match other_bindings with
+      | [] -> ok ()
+      | _ -> err `Let_and_not_supported
+    in
     let { pat; expr = vb_expr } = first_binding in
     (match pat with
      | Pattern.Pat_var x ->
@@ -136,91 +180,102 @@ let rec norm_comp expr (k : comp_expr -> nstate -> anf_expr * nstate) (st : nsta
            | (Comp_func _ | Comp_tuple _) as ce ->
              fun st ->
                let tmp, st1 = fresh st in
-               let body_anf, st2 = norm_comp body k st1 in
-               ( Anf_let
-                   ( Nonrecursive
-                   , tmp
-                   , ce
-                   , Anf_let (rec_flag, x, Comp_imm (Imm_ident tmp), body_anf) )
-               , st2 )
+               let* body_anf, st2 = norm_comp body k st1 in
+               ok
+                 ( Anf_let
+                     ( Nonrecursive
+                     , tmp
+                     , ce
+                     , Anf_let (rec_flag, x, Comp_imm (Imm_ident tmp), body_anf) )
+                 , st2 )
            | (Comp_imm _ | Comp_binop _ | Comp_app _ | Comp_branch _) as ce ->
              fun st ->
-               let body_anf, st' = norm_comp body k st in
-               Anf_let (rec_flag, x, ce, body_anf), st')
+               let* body_anf, st' = norm_comp body k st in
+               ok (Anf_let (rec_flag, x, ce, body_anf), st'))
          st
      | Pattern.Pat_any | Pattern.Pat_construct ("()", None) ->
        norm_comp
          vb_expr
          (fun ce st ->
             let tmp, st1 = fresh st in
-            let body_anf, st2 = norm_comp body k st1 in
-            Anf_let (Nonrecursive, tmp, ce, body_anf), st2)
+            let* body_anf, st2 = norm_comp body k st1 in
+            ok (Anf_let (Nonrecursive, tmp, ce, body_anf), st2))
          st
-     | _ -> failwith ("Unsupported pattern in `let`-binding: " ^ Pattern.show pat))
-  | _ -> failwith "unsupported expression in ANF normaliser"
+     | _ -> err (`Unsupported_let_pattern (Pattern.show pat)))
+  | _ -> err `Unsupported_expr_in_normaliser
 
-and norm_to_imm expr (k : im_expr -> nstate -> anf_expr * nstate) (st : nstate)
-  : anf_expr * nstate
+and norm_to_imm expr (k : im_expr -> nstate -> (anf_expr * nstate) r) (st : nstate)
+  : (anf_expr * nstate) r
   =
   norm_comp
     expr
-    (fun ce st ->
+    (fun ce st' ->
        match ce with
-       | Comp_imm imm -> k imm st
+       | Comp_imm imm -> k imm st'
        | _ ->
-         let tmp, st1 = fresh st in
-         let body, st2 = k (Imm_ident tmp) st1 in
-         Anf_let (Nonrecursive, tmp, ce, body), st2)
+         let tmp, st1 = fresh st' in
+         let* body, st2 = k (Imm_ident tmp) st1 in
+         ok (Anf_let (Nonrecursive, tmp, ce, body), st2))
     st
 
 and norm_list_to_imm
       expr_list
-      (k : im_expr list -> nstate -> anf_expr * nstate)
+      (k : im_expr list -> nstate -> (anf_expr * nstate) r)
       (st : nstate)
-  : anf_expr * nstate
+  : (anf_expr * nstate) r
   =
   match expr_list with
   | [] -> k [] st
   | hd :: tl ->
     norm_to_imm
       hd
-      (fun imm st1 -> norm_list_to_imm tl (fun imms st2 -> k (imm :: imms) st2) st1)
+      (fun imm st1 ->
+         let* res = norm_list_to_imm tl (fun imms st2 -> k (imm :: imms) st2) st1 in
+         ok res)
       st
 
-and norm_body expr (st : nstate) : anf_expr * nstate =
-  norm_to_imm expr (fun imm st -> Anf_comp_expr (Comp_imm imm), st) st
+and norm_body expr (st : nstate) : (anf_expr * nstate) r =
+  norm_to_imm expr (fun imm st -> ok (Anf_comp_expr (Comp_imm imm), st)) st
 ;;
 
-let norm_item (item : structure_item) (st : nstate) : astructure_item * nstate =
+let norm_item (item : structure_item) (st : nstate) : (astructure_item * nstate) r =
   match item with
   | Str_eval expr ->
-    let body_anf, st' = norm_body expr st in
-    Anf_str_eval body_anf, st'
+    let* body_anf, st' = norm_body expr st in
+    ok (Anf_str_eval body_anf, st')
   | Str_value (rec_flag, (first_binding, other_bindings)) ->
-    (match other_bindings with
-     | [] -> ()
-     | _ ->
-       failwith "Mutually recursive `let ... and ...` bindings are not supported yet.");
+    let* () =
+      match other_bindings with
+      | [] -> ok ()
+      | _ -> err `Mutual_rec_not_supported
+    in
     let { pat; expr } = first_binding in
     (match pat with
      | Pattern.Pat_var name ->
-       let body_anf, st' = norm_body expr st in
-       Anf_str_value (rec_flag, name, body_anf), st'
-     | _ ->
-       failwith
-         "Unsupported pattern in a top-level let-binding. Only simple variables are \
-          allowed.")
-  | _ -> failwith "Unsupported top-level structure item."
+       let* body_anf, st' = norm_body expr st in
+       ok (Anf_str_value (rec_flag, name, body_anf), st')
+     | _ -> err `Unsupported_toplevel_let)
+  | _ -> err `Unsupported_toplevel_item
+;;
+
+let anf_program_res (program : structure_item list) : (aprogram, anf_error) result =
+  let step (st, acc) item =
+    let* it, st' = norm_item item st in
+    ok (st', it :: acc)
+  in
+  let* _, rev_items =
+    List.fold_left
+      (fun acc item ->
+         let* st, xs = acc in
+         step (st, xs) item)
+      (ok (initial_state, []))
+      program
+  in
+  ok (List.rev rev_items)
 ;;
 
 let anf_program (program : structure_item list) : aprogram =
-  let _, rev_items =
-    List.fold_left
-      (fun (st, acc) item ->
-         let it, st' = norm_item item st in
-         st', it :: acc)
-      (initial_state, [])
-      program
-  in
-  List.rev rev_items
+  match anf_program_res program with
+  | Ok p -> p
+  | Error e -> invalid_arg (pp_anf_error e)
 ;;

@@ -426,8 +426,8 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li t0, 41
       addi sp, sp, -8
+      li t0, 41
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -485,8 +485,8 @@ let main =
       sd t0, -16(s0)
       addi sp, sp, -8
       sd a0, 0(sp)
-      ld t0, -16(s0)
       addi sp, sp, -8
+      ld t0, -16(s0)
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -512,8 +512,8 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li t0, 5
       addi sp, sp, -8
+      li t0, 5
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -572,8 +572,8 @@ let main =
       sd t0, -16(s0)
       addi sp, sp, -8
       sd a0, 0(sp)
-      ld t0, -16(s0)
       addi sp, sp, -8
+      ld t0, -16(s0)
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -599,8 +599,8 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -649,8 +649,8 @@ let%expect_test "factorial_basic_codegen" =
       sd t0, -16(s0)
       addi sp, sp, -8
       sd a0, 0(sp)
-      ld t0, -16(s0)
       addi sp, sp, -8
+      ld t0, -16(s0)
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -774,8 +774,8 @@ let%expect_test "ifs" =
       li t0, 1
     endif_7:
       sd t0, -32(s0)
-      ld t0, -32(s0)
       addi sp, sp, -8
+      ld t0, -32(s0)
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -889,8 +889,8 @@ let%expect_test "ifs" =
       li t0, 1
     endif_7:
       sd t0, -32(s0)
-      ld t0, -32(s0)
       addi sp, sp, -8
+      ld t0, -32(s0)
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -938,8 +938,8 @@ let main =
       sd t0, -16(s0)
       addi sp, sp, -8
       sd a0, 0(sp)
-      ld t0, -16(s0)
       addi sp, sp, -8
+      ld t0, -16(s0)
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -954,8 +954,8 @@ let main =
       sd t0, -32(s0)
       addi sp, sp, -8
       sd a0, 0(sp)
-      ld t0, -32(s0)
       addi sp, sp, -8
+      ld t0, -32(s0)
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -981,8 +981,8 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -1082,11 +1082,11 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
@@ -1165,29 +1165,29 @@ let main =
       sd ra, 24(sp)
       sd s0, 16(sp)
       addi s0, sp, 16
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
-      li t0, 2
       addi sp, sp, -8
+      li t0, 2
       sd t0, 0(sp)
       ld a0, 0(sp)
       addi sp, sp, 8
