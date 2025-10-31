@@ -20,8 +20,10 @@ type comp_expr =
   | Comp_branch of im_expr * anf_expr * anf_expr (* if c then ... else ... *)
   | Comp_func of ident list * anf_expr (* fun x y ... -> ... *)
   | Comp_tuple of im_expr list
-  | Comp_alloc of im_expr list (* Allocate a memory block and initialize it with values. *)
-  | Comp_load of im_expr * int    (* Load a value from memory: Comp_load(address, byte_offset). *)
+  | Comp_alloc of
+      im_expr list (* Allocate a memory block and initialize it with values. *)
+  | Comp_load of
+      im_expr * int (* Load a value from memory: Comp_load(address, byte_offset). *)
 
 and anf_expr =
   | Anf_comp_expr of comp_expr
@@ -190,7 +192,12 @@ let rec norm_comp expr (k : comp_expr -> nstate -> (anf_expr * nstate) r) (st : 
                      , ce
                      , Anf_let (rec_flag, x, Comp_imm (Imm_ident tmp), body_anf) )
                  , st2 )
-           | (Comp_imm _ | Comp_binop _ | Comp_app _ | Comp_branch _ | Comp_load _ | Comp_tuple _) as ce ->
+           | ( Comp_imm _
+             | Comp_binop _
+             | Comp_app _
+             | Comp_branch _
+             | Comp_load _
+             | Comp_tuple _ ) as ce ->
              fun st ->
                let* body_anf, st' = norm_comp body k st in
                ok (Anf_let (rec_flag, x, ce, body_anf), st'))

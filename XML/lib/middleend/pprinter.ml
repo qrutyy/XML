@@ -51,11 +51,10 @@ let rec print_anf_expr_impl ~needs_parens ppf expr =
       print_anf_expr_impl ~needs_parens:false ppf body;
       close_box ()
     | Comp_tuple items ->
-          fprintf ppf "(%a)" (pp_print_list_with_sep ~sep:"," print_immediate) items
+      fprintf ppf "(%a)" (pp_print_list_with_sep ~sep:"," print_immediate) items
     | Comp_alloc items ->
       fprintf ppf "alloc(%a)" (pp_print_list_with_sep ~sep:"," print_immediate) items
-    | Comp_load (addr, offset) ->
-      fprintf ppf "%a[%d]" print_immediate addr offset
+    | Comp_load (addr, offset) -> fprintf ppf "%a[%d]" print_immediate addr offset
   in
   if needs_parens then fprintf ppf "(";
   (match expr with
@@ -83,4 +82,3 @@ let print_anf_program ppf (program : aprogram) =
   pp_print_list ~pp_sep print_anf_structure_item ppf program;
   pp_print_newline ppf ()
 ;;
-

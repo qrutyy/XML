@@ -4,14 +4,13 @@
 
 open Common.Ast
 open Anf
-
 module S = Set.Make (String)
 
 let word_size = 8
 
 type state =
-  { next_fn_id : int 
-  ; new_defs : astructure_item list 
+  { next_fn_id : int
+  ; new_defs : astructure_item list
   }
 
 let initial_state = { next_fn_id = 0; new_defs = [] }
@@ -61,7 +60,9 @@ and fv_comp_expr bound_vars cexpr =
   | Comp_binop (_, v1, v2) -> S.union (fv_imm v1) (fv_imm v2)
   | Comp_app (func, args) -> S.union (fv_imm func) (fv_imms args)
   | Comp_branch (cond, then_, else_) ->
-    S.union (fv_imm cond) (S.union (fv_anf_expr bound_vars then_) (fv_anf_expr bound_vars else_))
+    S.union
+      (fv_imm cond)
+      (S.union (fv_anf_expr bound_vars then_) (fv_anf_expr bound_vars else_))
   | Comp_func (params, body) ->
     let bound_vars' = S.add_seq (List.to_seq params) bound_vars in
     fv_anf_expr bound_vars' body
@@ -105,7 +106,6 @@ and cc_comp_expr bound_vars st cexpr : anf_expr * state =
     let code_name, st' = fresh_lambda_name st in
     let env_param = "env" in
     let new_params = env_param :: params in
-
     let new_body =
       let lets_to_add =
         List.mapi
@@ -113,9 +113,8 @@ and cc_comp_expr bound_vars st cexpr : anf_expr * state =
              Anf_let
                ( Expression.Nonrecursive
                , var
-                 Comp_load (Imm_ident env_param, (i + 1) * word_size)
-               , (* placeholder, will be replaced with body *)
-                 Anf_comp_expr (Comp_imm (Imm_num 0)) ))
+               , Comp_load (Imm_ident env_param, (i + 1) * word_size)
+               , Anf_comp_expr (Comp_imm (Imm_num 0)) ))
           free_vars
       in
       let body_with_lets =
@@ -133,9 +132,12 @@ and cc_comp_expr bound_vars st cexpr : anf_expr * state =
     in
     let final_body, st_after_body = new_body in
     let new_func_code = Anf_comp_expr (Comp_func (new_params, final_body)) in
-    let new_func_def = Anf_str_value (Expression.Nonrecursive, code_name, new_func_code) in
-    let st_final = { st_after_body with new_defs = new_func_def :: st_after_body.new_defs } in
-
+    let new_func_def =
+      Anf_str_value (Expression.Nonrecursive, code_name, new_func_code)
+    in
+    let st_final =
+      { st_after_body with new_defs = new_func_def :: st_after_body.new_defs }
+    in
     (* Create an expression that allocates memory for the closure and initializes it. )
     ( [code_address, value_fv1, value_fv2, ...] *)
     let closure_alloc =
@@ -160,16 +162,17 @@ and cc_comp_expr bound_vars st cexpr : anf_expr * state =
             ( Expression.Nonrecursive
             , temp_code
             , Comp_load (Imm_ident temp_closure, 0)
-            , Anf_comp_expr (Comp_app (Imm_ident temp_code, Imm_ident temp_closure :: args)) ) )
+            , Anf_comp_expr
+                (Comp_app (Imm_ident temp_code, Imm_ident temp_closure :: args)) ) )
     in
     call_expr, st
   | Comp_branch (cond, then_, else_) ->
     let then', st' = cc_anf_expr bound_vars st then_ in
     let else', st'' = cc_anf_expr bound_vars st' else_ in
     Anf_comp_expr (Comp_branch (cond, then', else')), st''
-  | Comp_imm _ | Comp_binop _ | Comp_alloc _ | Comp_load _ | Comp_tuple _ -> Anf_comp_expr cexpr, st
+  | Comp_imm _ | Comp_binop _ | Comp_alloc _ | Comp_load _ | Comp_tuple _ ->
+    Anf_comp_expr cexpr, st
 ;;
-
 
 let cc_structure_item st item =
   let bound_vars = S.empty in
@@ -183,7 +186,6 @@ let cc_structure_item st item =
     let expr', st' = cc_anf_expr bound_vars' st expr in
     Anf_str_value (rec_flag, name, expr'), st'
 ;;
-
 
 (**
  * @param program ANF program.

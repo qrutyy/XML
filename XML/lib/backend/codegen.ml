@@ -41,11 +41,11 @@ module ArityMap = struct
 end
 
 let initial_arity_map =
-    let arity_map = ArityMap.empty () in
-    let arity_map = ArityMap.bind arity_map "print_int" 1 in
-    let arity_map = ArityMap.bind arity_map "malloc" 1 in
-    let arity_map = ArityMap.bind arity_map "alloc_closure" 2 in
-  ArityMap.bind arity_map "apply1" 2 
+  let arity_map = ArityMap.empty () in
+  let arity_map = ArityMap.bind arity_map "print_int" 1 in
+  let arity_map = ArityMap.bind arity_map "malloc" 1 in
+  let arity_map = ArityMap.bind arity_map "alloc_closure" 2 in
+  ArityMap.bind arity_map "apply1" 2
 ;;
 
 type cg_state =
@@ -175,9 +175,9 @@ and gen_comp_expr (state : cg_state) (dst : reg) (cexpr : comp_expr) : cg_state 
               List.iteri
                 (fun i arg_imm ->
                    if i < Array.length Target.arg_regs
-                   then
+                   then (
                      let (_ : unit r) = gen_im_expr state (A i) arg_imm in
-                     ()
+                     ())
                    else (* Handle stack arguments if necessary *)
                      ())
                 args_imms;
@@ -260,7 +260,11 @@ and gen_comp_expr (state : cg_state) (dst : reg) (cexpr : comp_expr) : cg_state 
            emit sd (T 1) (A 0, i * Target.word_size);
            ok ())
         imms
-      |> List.fold_left (fun acc r -> let* () = acc in r) (ok ())
+      |> List.fold_left
+           (fun acc r ->
+              let* () = acc in
+              r)
+           (ok ())
     in
     if not (equal_reg dst (A 0)) then emit mv dst (A 0);
     ok state
@@ -280,7 +284,13 @@ let rec count_locals_in_anf (aexpr : anf_expr) : int =
 
 and count_locals_in_comp (cexpr : comp_expr) : int =
   match cexpr with
-  | Comp_imm _ | Comp_binop _ | Comp_app _ | Comp_func _ | Comp_tuple _ | Comp_alloc _ | Comp_load _ -> 0
+  | Comp_imm _
+  | Comp_binop _
+  | Comp_app _
+  | Comp_func _
+  | Comp_tuple _
+  | Comp_alloc _
+  | Comp_load _ -> 0
   | Comp_branch (_, then_anf, else_anf) ->
     let locals_in_then = count_locals_in_anf then_anf in
     let locals_in_else = count_locals_in_anf else_anf in

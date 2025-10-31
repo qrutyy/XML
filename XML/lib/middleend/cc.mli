@@ -4,4 +4,4 @@
 
 open Anf
 
-val cc_program: aprogram -> aprogram
+val cc_program : aprogram -> aprogram
