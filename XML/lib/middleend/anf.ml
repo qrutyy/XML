@@ -20,6 +20,10 @@ type comp_expr =
   | Comp_branch of im_expr * anf_expr * anf_expr (* if c then ... else ... *)
   | Comp_func of ident list * anf_expr (* fun x y ... -> ... *)
   | Comp_tuple of im_expr list
+  | Comp_alloc of
+      im_expr list (* Allocate a memory block and initialize it with values. *)
+  | Comp_load of
+      im_expr * int (* Load a value from memory: Comp_load(address, byte_offset). *)
 
 and anf_expr =
   | Anf_comp_expr of comp_expr
@@ -115,7 +119,7 @@ let rec norm_comp expr (k : comp_expr -> nstate -> (anf_expr * nstate) r) (st : 
   | Exp_constant c -> k (Comp_imm (normalise_const c)) st
   | Exp_tuple (expr1, expr2, rest_list) ->
     let all_exprs = expr1 :: expr2 :: rest_list in
-    norm_list_to_imm all_exprs (fun imm_list st -> k (Comp_tuple imm_list) st) st
+    norm_list_to_imm all_exprs (fun imm_list st -> k (Comp_alloc imm_list) st) st
   | Exp_apply (Exp_ident op, Exp_tuple (expr1, expr2, []))
     when List.mem op [ "+"; "-"; "*"; "="; "<"; ">"; "<="; ">="; "<>" ] ->
     norm_to_imm
@@ -135,17 +139,11 @@ let rec norm_comp expr (k : comp_expr -> nstate -> (anf_expr * nstate) r) (st : 
            in
            k ce st))
       st
-  | Exp_apply (_, _) ->
-    let rec collect_args_and_func expr acc =
-      match expr with
-      | Exp_apply (f, arg) -> collect_args_and_func f (arg :: acc)
-      | f -> f, acc
-    in
-    let func_expr, args_exprs = collect_args_and_func expr [] in
-    let flat_args = List.concat_map flatten_arg_expr args_exprs in
+  | Exp_apply (func_expr, arg_expr) ->
     norm_to_imm
       func_expr
       (fun func_imm ->
+         let flat_args = flatten_arg_expr arg_expr in
          norm_list_to_imm flat_args (fun args_imms st ->
            k (Comp_app (func_imm, args_imms)) st))
       st
@@ -177,7 +175,7 @@ let rec norm_comp expr (k : comp_expr -> nstate -> (anf_expr * nstate) r) (st : 
        norm_comp
          vb_expr
          (function
-           | (Comp_func _ | Comp_tuple _) as ce ->
+           | (Comp_func _ | Comp_alloc _) as ce ->
              fun st ->
                let tmp, st1 = fresh st in
                let* body_anf, st2 = norm_comp body k st1 in
@@ -188,7 +186,12 @@ let rec norm_comp expr (k : comp_expr -> nstate -> (anf_expr * nstate) r) (st : 
                      , ce
                      , Anf_let (rec_flag, x, Comp_imm (Imm_ident tmp), body_anf) )
                  , st2 )
-           | (Comp_imm _ | Comp_binop _ | Comp_app _ | Comp_branch _) as ce ->
+           | ( Comp_imm _
+             | Comp_binop _
+             | Comp_app _
+             | Comp_branch _
+             | Comp_load _
+             | Comp_tuple _ ) as ce ->
              fun st ->
                let* body_anf, st' = norm_comp body k st in
                ok (Anf_let (rec_flag, x, ce, body_anf), st'))

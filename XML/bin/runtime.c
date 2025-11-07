@@ -15,7 +15,7 @@
 
 void print_int(int64_t n)
 {
-    printf("%" PRId64, n);
+    printf("%" PRId64 "\n", n);
     fflush(stdout);
 }
 
@@ -38,15 +38,23 @@ static inline size_t clos_size_bytes(int64_t arity)
 {
     return sizeof(Closure) + (size_t)arity * sizeof(void *);
 }
-
 static inline void *rv_call(void *fn, void **argv, int64_t n)
 {
     int64_t spill = (n > RV_GP_ARGS) ? (n - RV_GP_ARGS) : 0;
     size_t spill_bytes = (size_t)spill * WORD_SZ;
     void **spill_ptr = (spill > 0) ? argv + RV_GP_ARGS : NULL;
 
+    /* fprintf(stderr, "\n=== rv_call debug ===\n");
+    fprintf(stderr, "fn = %p, n = %" PRId64 "\n", fn, n);
+    for (int64_t i = 0; i < n; ++i)
+        fprintf(stderr, "  argv[%ld] = %p\n", i, argv[i]);
+    fprintf(stderr, "spill = %" PRId64 " (%zu bytes) spill_ptr=%p\n",
+            spill, spill_bytes, spill_ptr);
+    fflush(stderr);
+	*/
+
     void *ret;
-    asm(
+    asm volatile(
         "mv   t0, %[sz]\n"
         "sub  sp, sp, t0\n"
 
@@ -98,11 +106,15 @@ static inline void *rv_call(void *fn, void **argv, int64_t n)
         : "t0", "t1", "t2", "t3", "t4", "t5", "t6",
           "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7",
           "memory");
+
+    //fprintf(stderr, "rv_call returned from %p → ret=%p\n\n", fn, ret);
+    //fflush(stderr);
     return ret;
 }
 
 Closure *alloc_closure(void *code, int64_t arity)
 {
+	// fprintf(stderr, "alloc_closure(%p, %" PRId64 ")\n", code, arity);
     if (arity < 0)
         panic("alloc_closure: negative arity");
     Closure *c = (Closure *)malloc(clos_size_bytes(arity));
