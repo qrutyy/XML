@@ -20,7 +20,7 @@ let ( let* ) = Result.bind
 
 let std_lib_names =
   [ "print_int"
-  ; "malloc"
+  ; "alloc_block"
   ; "alloc_closure"
   ; "apply1"
   ; "+"

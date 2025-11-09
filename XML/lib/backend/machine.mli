@@ -40,6 +40,8 @@ type instr =
   | Ecall (* ECALL *)
   | Ret (* return *)
   | La of reg * string (* Load Address of labeled function into the reg *)
+  | Slli of reg * reg * int (* << imm *)
+  | Srai of reg * reg * int (* >> imm (arith) *)
 
 val pp_instr : Format.formatter -> instr -> unit
 val addi : (instr -> 'a) -> reg -> reg -> int -> 'a
@@ -66,3 +68,5 @@ val j : (instr -> 'a) -> string -> 'a
 val la : (instr -> 'a) -> reg -> string -> 'a
 val comment : (instr -> 'a) -> string -> 'a
 val label : (instr -> 'a) -> string -> 'a
+val slli : (instr -> 'a) -> reg -> reg -> int -> 'a
+val srai : (instr -> 'a) -> reg -> reg -> int -> 'a

@@ -43,7 +43,7 @@ end
 let initial_arity_map =
   let arity_map = ArityMap.empty () in
   let arity_map = ArityMap.bind arity_map "print_int" 1 in
-  let arity_map = ArityMap.bind arity_map "malloc" 1 in
+  let arity_map = ArityMap.bind arity_map "alloc_block" 1 in
   let arity_map = ArityMap.bind arity_map "alloc_closure" 2 in
   ArityMap.bind arity_map "apply1" 2
 ;;
@@ -80,7 +80,8 @@ let fresh_label (prefix : string) (st : cg_state) : string * cg_state =
 let gen_im_expr (state : cg_state) (dst : reg) (imm : im_expr) : unit r =
   match imm with
   | Imm_num n ->
-    emit li dst n;
+    (* tagged integer: (n<<1)|1 *)
+    emit li dst ((n lsl 1) lor 1);
     ok ()
   | Imm_ident x ->
     (match Env.find state.env x with
@@ -124,7 +125,7 @@ and gen_comp_expr (state : cg_state) (dst : reg) (cexpr : comp_expr) : cg_state 
   | Comp_binop (op, v1, v2) ->
     let* () = gen_im_expr state (T 0) v1 in
     let* () = gen_im_expr state (T 1) v2 in
-    emit_bin_op op dst (T 0) (T 1);
+    emit_tagged_binop op dst (T 0) (T 1);
     ok state
   | Comp_app (func_imm, args_imms) ->
     let live_regs_to_save =
@@ -273,14 +274,18 @@ and gen_comp_expr (state : cg_state) (dst : reg) (cexpr : comp_expr) : cg_state 
     ok state
   | Comp_tuple _ -> err `Tuple_not_impl
   | Comp_alloc imms ->
-    let size = List.length imms * Target.word_size in
-    emit li (A 0) size;
-    emit call "malloc";
+    (* allocate Block(len) and store elements at base+16 (GCHeader+len) *)
+    let len = List.length imms in
+    emit li (A 0) len;
+    emit call "alloc_block";
+    (* A0 = Block* *)
+    emit addi (T 2) (A 0) 16;
+    (* T2 = &elems[0] *)
     let* () =
       List.mapi
         (fun i imm ->
            let* () = gen_im_expr state (T 1) imm in
-           emit sd (T 1) (A 0, i * Target.word_size);
+           emit sd (T 1) (T 2, i * Target.word_size);
            ok ())
         imms
       |> List.fold_left
@@ -293,6 +298,8 @@ and gen_comp_expr (state : cg_state) (dst : reg) (cexpr : comp_expr) : cg_state 
     ok state
   | Comp_load (addr_imm, offset) ->
     let* () = gen_im_expr state (T 0) addr_imm in
+    emit addi (T 0) (T 0) 16;
+    (* skip header *)
     emit ld dst (T 0, offset);
     ok state
 ;;
@@ -344,6 +351,11 @@ let gen_func
   let local_count = count_locals_in_anf body_anf in
   let initial_frame_size = (2 + local_count + 5) * Target.word_size in
   emit_prologue func_name initial_frame_size;
+  (* Initialize GC heap in main (64 MiB by default) *)
+  if func_name = "main"
+  then (
+    emit li (A 0) (64 * 1024 * 1024);
+    emit call "rt_init");
   let initial_state_for_body =
     { st with env = env_params; stack_offset = 0; arity = arity_map }
   in
