@@ -1,4 +1,4 @@
-.PHONY: all test exec fmt lint zanuda format
+.PHONY: all test exec fmt lint zanuda
 all:
 	dune build
 
@@ -10,16 +10,13 @@ exec:
 
 fmt:
 	dune build @fmt --auto-promote
-
+	./runtime-ci-script/format.sh
 lint:
 	dune build @lint --force
 
 zanuda:
 	dune build @check @runtest -j4
 	zanuda -dir .
-
-format: 
-	./runtime-ci-script/format.sh
 
 TEST_COV_D = /tmp/cov
 COVERAGE_OPTS = --coverage-path $(TEST_COV_D) --expect bin/

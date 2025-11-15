@@ -45,7 +45,10 @@ let initial_arity_map =
   let arity_map = ArityMap.bind arity_map "print_int" 1 in
   let arity_map = ArityMap.bind arity_map "alloc_block" 1 in
   let arity_map = ArityMap.bind arity_map "alloc_closure" 2 in
-  ArityMap.bind arity_map "apply1" 2
+  let arity_map = ArityMap.bind arity_map "apply1" 2 in
+  let arity_map = ArityMap.bind arity_map "print_gc_status" 0 in
+  let arity_map = ArityMap.bind arity_map "collect" 0 in
+  arity_map
 ;;
 
 type cg_state =
@@ -54,6 +57,7 @@ type cg_state =
   ; arity : ArityMap.t
   ; next_label : int
   ; deferred : (string * ident list * anf_expr) list
+  ; gc_stats : bool
   }
 
 type cg_error =
@@ -354,12 +358,18 @@ let gen_func
   (* Initialize GC heap in main (64 MiB by default) *)
   if func_name = "main"
   then (
-    emit li (A 0) (64 * 1024 * 1024);
-    emit call "rt_init");
+    emit li (A 0) (5 * 1024);
+    emit call "rt_init";
+    if st.gc_stats
+    then (
+      emit call "print_gc_status";
+      emit call "collect";
+      emit call "print_gc_status"));
   let initial_state_for_body =
     { st with env = env_params; stack_offset = 0; arity = arity_map }
   in
   let* state_after = gen_anf_expr initial_state_for_body (A 0) body_anf in
+  if func_name = "main" && st.gc_stats then emit call "print_gc_status";
   flush_queue ppf;
   emit_epilogue initial_frame_size;
   ok { st with next_label = state_after.next_label; deferred = state_after.deferred }
@@ -384,7 +394,7 @@ let prefill_arities (arity_map0 : ArityMap.t) (program : aprogram) : ArityMap.t 
     program
 ;;
 
-let gen_program_res ppf (program : aprogram) : unit r =
+let gen_program_res_with_gc ~gc_stats ppf (program : aprogram) : unit r =
   let has_main =
     List.exists
       (function
@@ -400,6 +410,7 @@ let gen_program_res ppf (program : aprogram) : unit r =
     ; arity = arity_map
     ; next_label = 0
     ; deferred = []
+    ; gc_stats
     }
   in
   let* st1 =
@@ -439,8 +450,8 @@ let gen_program_res ppf (program : aprogram) : unit r =
   ok ()
 ;;
 
-let gen_program ppf (program : aprogram) =
-  match gen_program_res ppf program with
+let gen_program_with_gc_stats ~gc_stats ppf (program : aprogram) =
+  match gen_program_res_with_gc ~gc_stats ppf program with
   | Ok () -> ()
   | Error (`Unbound_identifier x) ->
     invalid_arg ("Unbound identifier during codegen: " ^ x)
@@ -457,4 +468,8 @@ let gen_program ppf (program : aprogram) =
          got)
   | Error `Call_non_function -> invalid_arg "Runtime error: attempted to call a number."
   | Error `Tuple_not_impl -> invalid_arg "Tuple values are not yet implemented"
+;;
+
+let gen_program ppf (program : aprogram) =
+  gen_program_with_gc_stats ~gc_stats:false ppf program
 ;;

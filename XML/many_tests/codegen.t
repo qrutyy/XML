@@ -60,7 +60,7 @@
     sd ra, 64(sp)
     sd s0, 56(sp)
     addi s0, sp, 56
-    li a0, 67108864
+    li a0, 5120
     call rt_init
     li t0, 9
     addi sp, sp, -8
@@ -166,7 +166,7 @@
     sd ra, 64(sp)
     sd s0, 56(sp)
     addi s0, sp, 56
-    li a0, 67108864
+    li a0, 5120
     call rt_init
     li t0, 13
     addi sp, sp, -8
@@ -261,7 +261,7 @@
     sd ra, 96(sp)
     sd s0, 88(sp)
     addi s0, sp, 88
-    li a0, 67108864
+    li a0, 5120
     call rt_init
     li t0, 1
     li t1, 3
@@ -390,7 +390,7 @@
     sd ra, 64(sp)
     sd s0, 56(sp)
     addi s0, sp, 56
-    li a0, 67108864
+    li a0, 5120
     call rt_init
     call partialapp_sum
     mv t0, a0
@@ -597,7 +597,7 @@
     sd ra, 72(sp)
     sd s0, 64(sp)
     addi s0, sp, 64
-    li a0, 67108864
+    li a0, 5120
     call rt_init
     addi sp, sp, -8
     li t1, 9
@@ -946,7 +946,7 @@
     sd ra, 72(sp)
     sd s0, 64(sp)
     addi s0, sp, 64
-    li a0, 67108864
+    li a0, 5120
     call rt_init
     addi sp, sp, -8
     li t1, 13
@@ -1139,7 +1139,7 @@
     sd ra, 176(sp)
     sd s0, 168(sp)
     addi s0, sp, 168
-    li a0, 67108864
+    li a0, 5120
     call rt_init
     la a0, test10
     li a1, 10
