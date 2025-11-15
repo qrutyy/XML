@@ -1,11 +1,11 @@
 /*Copyright 2024, Mikhail Gavrilenko, Danila Rudnev-Stepanyan, Daniel Vlasenko*/
 
+#include <alloca.h>
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <alloca.h>
 
 typedef uintptr_t value;
 
@@ -15,43 +15,41 @@ typedef uintptr_t value;
 #define RV_GP_ARGS 8
 #define WORD_SZ 8
 
-static inline value mk_int(int64_t n) { return ((value)n << 1) | TAG_INT; }
-static inline int64_t un_int(value v) { return (int64_t)(v >> 1); }
+static inline value mk_int(int64_t n) {
+    return ((value)n << 1) | TAG_INT;
+}
+static inline int64_t un_int(value v) {
+    return (int64_t)(v >> 1);
+}
 
-__attribute__((noreturn)) static void panic(const char *msg)
-{
+__attribute__((noreturn)) static void panic(const char *msg) {
     fputs(msg, stderr);
     fputc('\n', stderr);
     abort();
 }
 
-void print_int(int64_t tagged)
-{
+void print_int(int64_t tagged) {
     printf("%" PRId64 "\n", (int64_t)(((value)tagged) >> 1));
     fflush(stdout);
 }
 
 typedef struct GCType GCType;
-typedef struct
-{
+typedef struct {
     GCType *type;
 } GCHeader;
 
-struct GCType
-{
+struct GCType {
     size_t (*size_bytes)(uint8_t *obj);
     void (*scan)(uint8_t *obj);
 };
 
-typedef struct Block
-{
+typedef struct Block {
     GCHeader h;
     int64_t len;
     value elems[];
 } Block;
 
-typedef struct Closure
-{
+typedef struct Closure {
     GCHeader h;
     int64_t arity;
     int64_t received;
@@ -61,15 +59,13 @@ typedef struct Closure
 
 typedef struct Closure Closure;
 
-static size_t block_size_of(uint8_t *p)
-{
+static size_t block_size_of(uint8_t *p) {
     Block *b = (Block *)p;
     return sizeof(Block) + (size_t)b->len * sizeof(value);
 }
 static void block_scan(uint8_t *p);
 
-static size_t clos_size_of(uint8_t *p)
-{
+static size_t clos_size_of(uint8_t *p) {
     Closure *c = (Closure *)p;
     return sizeof(Closure) + (size_t)c->arity * sizeof(value);
 }
@@ -84,31 +80,25 @@ static uint8_t *to_start, *to_end;
 static uint8_t *alloc_ptr;
 static uint8_t *to_alloc;
 
-static inline int in_from(const void *p)
-{
+static inline int in_from(const void *p) {
     const uint8_t *x = (const uint8_t *)p;
     return x >= from_start && x < from_end;
 }
-static inline int in_to(const void *p)
-{
+static inline int in_to(const void *p) {
     const uint8_t *x = (const uint8_t *)p;
     return x >= to_start && x < to_end;
 }
 static uint8_t *stack_top;
 
-void rt_init(size_t heap_bytes)
-{
+void rt_init(size_t heap_bytes) {
     uint8_t marker;
     stack_top = (uint8_t *)&marker;
 
-    if (heap_bytes < (size_t)1 << 20)
-        heap_bytes = (size_t)1 << 20;
-    if (heap_bytes & 1u)
-        heap_bytes++;
+    if (heap_bytes < (size_t)1 << 20) heap_bytes = (size_t)1 << 20;
+    if (heap_bytes & 1u) heap_bytes++;
 
     uint8_t *heap = (uint8_t *)malloc(heap_bytes);
-    if (!heap)
-        panic("rt_init: OOM");
+    if (!heap) panic("rt_init: OOM");
 
     size_t half = heap_bytes / 2u;
     from_start = heap;
@@ -120,39 +110,31 @@ void rt_init(size_t heap_bytes)
     to_alloc = to_start;
 }
 
-static inline int is_forwarded(GCHeader *h)
-{
+static inline int is_forwarded(GCHeader *h) {
     /*  вв старой копии после копирования header.type указывает на новую копию в to-space */
     return in_to(h->type);
 }
 
 static uint8_t *forward_obj(uint8_t *old);
 
-static value forward_val(value v)
-{
-    if (!IS_PTR(v))
-        return v;
-    if (!in_from((void *)v))
-        return v;
+static value forward_val(value v) {
+    if (!IS_PTR(v)) return v;
+    if (!in_from((void *)v)) return v;
     return (value)forward_obj((uint8_t *)v);
 }
 
-static uint8_t *forward_obj(uint8_t *old)
-{
-    if (!in_from(old))
-        return old;
+static uint8_t *forward_obj(uint8_t *old) {
+    if (!in_from(old)) return old;
 
     GCHeader *h = (GCHeader *)old;
 
-    if (is_forwarded(h))
-        return (uint8_t *)h->type;
+    if (is_forwarded(h)) return (uint8_t *)h->type;
 
     GCType *vt = h->type;
     size_t sz = vt->size_bytes(old);
     size_t rounded = (sz + 7u) & ~7u;
 
-    if (to_alloc + rounded > to_end)
-        panic("GC: to-space overflow");
+    if (to_alloc + rounded > to_end) panic("GC: to-space overflow");
 
     uint8_t *dst = to_alloc;
     to_alloc += rounded;
@@ -164,42 +146,34 @@ static uint8_t *forward_obj(uint8_t *old)
     return dst;
 }
 
-static void block_scan(uint8_t *p)
-{
+static void block_scan(uint8_t *p) {
     Block *b = (Block *)p;
-    for (int64_t i = 0; i < b->len; ++i)
-    {
+    for (int64_t i = 0; i < b->len; ++i) {
         b->elems[i] = forward_val(b->elems[i]);
     }
 }
 
-static void clos_scan(uint8_t *p)
-{
+static void clos_scan(uint8_t *p) {
     Closure *c = (Closure *)p;
 
-    for (int64_t i = 0; i < c->received; ++i)
-    {
+    for (int64_t i = 0; i < c->received; ++i) {
         c->args[i] = forward_val(c->args[i]);
     }
 }
 
-static void gc_collect(void)
-{
+static void gc_collect(void) {
     to_alloc = to_start;
 
     uint8_t sp_marker;
     uint8_t *sp = (uint8_t *)&sp_marker;
-    for (value *slot = (value *)sp; (uint8_t *)slot < stack_top; ++slot)
-    {
+    for (value *slot = (value *)sp; (uint8_t *)slot < stack_top; ++slot) {
         value v = *slot;
-        if (IS_PTR(v) && in_from((void *)v))
-        {
+        if (IS_PTR(v) && in_from((void *)v)) {
             *slot = (value)forward_obj((uint8_t *)v);
         }
     }
 
-    for (uint8_t *scan = to_start; scan < to_alloc;)
-    {
+    for (uint8_t *scan = to_start; scan < to_alloc;) {
         GCHeader *h = (GCHeader *)scan;
         GCType *vt = h->type;
         vt->scan(scan);
@@ -217,14 +191,11 @@ static void gc_collect(void)
     alloc_ptr = to_alloc;
 }
 
-static void *gc_alloc_bytes(size_t n, GCType *vt)
-{
+static void *gc_alloc_bytes(size_t n, GCType *vt) {
     n = (n + 7u) & ~7u;
-    if (alloc_ptr + n > from_end)
-    {
+    if (alloc_ptr + n > from_end) {
         gc_collect();
-        if (alloc_ptr + n > from_end)
-            panic("GC: out of memory");
+        if (alloc_ptr + n > from_end) panic("GC: out of memory");
     }
     uint8_t *p = alloc_ptr;
     alloc_ptr += n;
@@ -233,20 +204,16 @@ static void *gc_alloc_bytes(size_t n, GCType *vt)
     return p;
 }
 
-static inline size_t block_bytes_for_len(int64_t len)
-{
+static inline size_t block_bytes_for_len(int64_t len) {
     return sizeof(Block) + (size_t)len * sizeof(value);
 }
 
-static inline size_t clos_bytes_for_arity(int64_t arity)
-{
+static inline size_t clos_bytes_for_arity(int64_t arity) {
     return sizeof(Closure) + (size_t)arity * sizeof(value);
 }
 
-void *alloc_block(int64_t size_bytes)
-{
-    if (size_bytes < 0)
-        panic("alloc_block: negative size");
+void *alloc_block(int64_t size_bytes) {
+    if (size_bytes < 0) panic("alloc_block: negative size");
     int64_t len = (int64_t)(size_bytes / (int64_t)sizeof(value));
     Block *b = (Block *)gc_alloc_bytes(block_bytes_for_len(len), &VT_Block);
     b->len = len;
@@ -254,28 +221,23 @@ void *alloc_block(int64_t size_bytes)
     return (void *)b->elems;
 }
 
-Closure *alloc_closure(void *code, int64_t arity)
-{
-    if (arity < 0)
-        panic("alloc_closure: negative arity");
+Closure *alloc_closure(void *code, int64_t arity) {
+    if (arity < 0) panic("alloc_closure: negative arity");
     Closure *c = (Closure *)gc_alloc_bytes(clos_bytes_for_arity(arity), &VT_Closure);
     c->arity = arity;
     c->received = 0;
     c->code = code;
-    if (arity)
-        memset(c->args, 0, (size_t)arity * sizeof(value));
+    if (arity) memset(c->args, 0, (size_t)arity * sizeof(value));
     return c;
 }
 
-Closure *copy_closure(const Closure *src)
-{
+Closure *copy_closure(const Closure *src) {
     Closure *dst = (Closure *)gc_alloc_bytes(clos_bytes_for_arity(src->arity), &VT_Closure);
     memcpy(dst, src, clos_bytes_for_arity(src->arity));
     return dst;
 }
 
-static value rv_call(void *fn, value *argv, int64_t n)
-{
+static value rv_call(void *fn, value *argv, int64_t n) {
     int64_t spill = (n > RV_GP_ARGS) ? (n - RV_GP_ARGS) : 0;
     size_t spill_bytes = (size_t)spill * WORD_SZ;
     value *spill_ptr = (spill > 0) ? argv + RV_GP_ARGS : NULL;
@@ -318,44 +280,32 @@ static value rv_call(void *fn, value *argv, int64_t n)
 
         "mv   %[ret], a0\n"
         : [ret] "=r"(ret)
-        : [fn] "r"(fn),
-          [a0] "r"((n > 0) ? argv[0] : 0),
-          [a1] "r"((n > 1) ? argv[1] : 0),
-          [a2] "r"((n > 2) ? argv[2] : 0),
-          [a3] "r"((n > 3) ? argv[3] : 0),
-          [a4] "r"((n > 4) ? argv[4] : 0),
-          [a5] "r"((n > 5) ? argv[5] : 0),
-          [a6] "r"((n > 6) ? argv[6] : 0),
-          [a7] "r"((n > 7) ? argv[7] : 0),
-          [spill] "r"(spill_ptr),
-          [cnt] "r"(spill),
-          [sz] "r"(spill_bytes)
-        : "t0", "t1", "t2", "t3", "t4", "t5", "t6",
-          "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "memory");
+        : [fn] "r"(fn), [a0] "r"((n > 0) ? argv[0] : 0), [a1] "r"((n > 1) ? argv[1] : 0),
+          [a2] "r"((n > 2) ? argv[2] : 0), [a3] "r"((n > 3) ? argv[3] : 0),
+          [a4] "r"((n > 4) ? argv[4] : 0), [a5] "r"((n > 5) ? argv[5] : 0),
+          [a6] "r"((n > 6) ? argv[6] : 0), [a7] "r"((n > 7) ? argv[7] : 0), [spill] "r"(spill_ptr),
+          [cnt] "r"(spill), [sz] "r"(spill_bytes)
+        : "t0", "t1", "t2", "t3", "t4", "t5", "t6", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7",
+          "memory");
     return ret;
 }
 
-value apply1(Closure *f, value arg)
-{
-    if (!f)
-        panic("apply1: null closure");
+value apply1(Closure *f, value arg) {
+    if (!f) panic("apply1: null closure");
 
     const int64_t r = f->received;
     const int64_t n = f->arity;
 
-    if (r + 1 < n)
-    {
+    if (r + 1 < n) {
         Closure *g = copy_closure(f);
         g->args[g->received++] = arg;
         return (value)g;
     }
 
-    if (r + 1 == n)
-    {
+    if (r + 1 == n) {
         int64_t m = n ? n : 1;
         value *argv = (value *)alloca((size_t)m * sizeof(value));
-        for (int64_t i = 0; i < r; ++i)
-            argv[i] = f->args[i];
+        for (int64_t i = 0; i < r; ++i) argv[i] = f->args[i];
         argv[r] = arg;
         return rv_call(f->code, argv, n);
     }
