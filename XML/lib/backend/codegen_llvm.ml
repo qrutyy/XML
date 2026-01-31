@@ -23,7 +23,12 @@ let gen_im_expr_ir = function
      | None -> invalid_arg ("Name not bound: " ^ id))
 ;;
 
-let gen_comp_expr_ir = function
+let create_entry_alloca the_fun var_name =
+  let builder = Llvm.builder_at context (Llvm.instr_begin (Llvm.entry_block the_fun)) in
+  Llvm.build_alloca i64_type var_name builder
+;;
+
+let rec gen_comp_expr_ir = function
   | Comp_imm imm -> gen_im_expr_ir imm
   | Comp_binop (op, lhs, rhs) ->
     let lhs_val = gen_im_expr_ir lhs in
@@ -58,15 +63,35 @@ let gen_comp_expr_ir = function
     let arg_types = Array.map Llvm.type_of arg_vals in
     let f_type = Llvm.function_type default_type arg_types in
     Llvm.build_call f_type f_val arg_vals "calltmp" builder
+  | Comp_branch (cond, br_then, br_else) ->
+    let cv = gen_im_expr_ir cond in
+    let zero = Llvm.const_int i64_type 0 in
+    let cond_val = Llvm.build_icmp Llvm.Icmp.Ne cv zero "cond" builder in
+    let start_bb = Llvm.insertion_block builder in
+    let the_fun = Llvm.block_parent start_bb in
+    let then_bb = Llvm.append_block context "then" the_fun in
+    Llvm.position_at_end then_bb builder;
+    let then_val = gen_anf_expr br_then in
+    let new_then_bb = Llvm.insertion_block builder in
+    let else_bb = Llvm.append_block context "else" the_fun in
+    Llvm.position_at_end else_bb builder;
+    let else_val = gen_anf_expr br_else in
+    let new_else_bb = Llvm.insertion_block builder in
+    let merge_bb = Llvm.append_block context "ifcont" the_fun in
+    Llvm.position_at_end merge_bb builder;
+    let incoming = [ then_val, new_then_bb; else_val, new_else_bb ] in
+    let phi = Llvm.build_phi incoming "iftmp" builder in
+    Llvm.position_at_end start_bb builder;
+    let _ = Llvm.build_cond_br cond_val then_bb else_bb builder in
+    Llvm.position_at_end new_then_bb builder;
+    let _ = Llvm.build_br merge_bb builder in
+    Llvm.position_at_end new_else_bb builder;
+    let _ = Llvm.build_br merge_bb builder in
+    Llvm.position_at_end merge_bb builder;
+    phi
   | _ -> failwith "not implemented"
-;;
 
-let create_entry_alloca the_fun var_name =
-  let builder = Llvm.builder_at context (Llvm.instr_begin (Llvm.entry_block the_fun)) in
-  Llvm.build_alloca i64_type var_name builder
-;;
-
-let rec gen_anf_expr = function
+and gen_anf_expr = function
   | Anf_comp_expr comp -> gen_comp_expr_ir comp
   | Anf_let (_, name, comp_expr, body) ->
     let init_val = gen_comp_expr_ir comp_expr in
