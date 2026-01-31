@@ -13,6 +13,8 @@ let builder = Llvm.builder context
 let the_module = Llvm.create_module context "main"
 let named_values : (string, Llvm.llvalue) Hashtbl.t = Hashtbl.create 16
 
+(* don't forget about tagged integers *)
+
 let gen_im_expr_ir = function
   | Imm_num n -> Llvm.const_int i64_type n
   | Imm_ident id ->
@@ -59,15 +61,20 @@ let gen_comp_expr_ir = function
   | _ -> failwith "not implemented"
 ;;
 
-let gen_anf_expr = function
-  (* | Anf_comp_expr (Comp_func (params, body)) -> gen_function params body *)
-  | Anf_comp_expr comp -> gen_comp_expr_ir comp
-  | _ -> failwith "not implemented"
-;;
-
 let create_entry_alloca the_fun var_name =
   let builder = Llvm.builder_at context (Llvm.instr_begin (Llvm.entry_block the_fun)) in
   Llvm.build_alloca i64_type var_name builder
+;;
+
+let rec gen_anf_expr = function
+  | Anf_comp_expr comp -> gen_comp_expr_ir comp
+  | Anf_let (_, name, comp_expr, body) ->
+    let init_val = gen_comp_expr_ir comp_expr in
+    let the_fun = Llvm.block_parent (Llvm.insertion_block builder) in
+    let alloca = create_entry_alloca the_fun name in
+    let _ = Llvm.build_store init_val alloca builder in
+    Hashtbl.add named_values name alloca;
+    gen_anf_expr body
 ;;
 
 let gen_function name (params : string list) body =
@@ -80,10 +87,10 @@ let gen_function name (params : string list) body =
     | Some f ->
       if Int.(Array.length (Llvm.basic_blocks f) = 0)
       then ()
-      else invalid_arg ("Redifinition of function: " ^ name);
+      else invalid_arg ("Redefinition of function: " ^ name);
       if Int.(Array.length (Llvm.params f) = List.length params)
       then ()
-      else invalid_arg ("Redifinition of function with different number of args: " ^ name);
+      else invalid_arg ("Redefinition of function with different number of args: " ^ name);
       f
   in
   (* build allocas and add names for parameters *)
@@ -115,13 +122,26 @@ let gen_function name (params : string list) body =
   the_fun
 ;;
 
+(*
+   let gen_variable name value =
+  let the_var =
+    match Llvm.lookup_global name the_module with
+    | None -> Llvm.define_global name value the_module
+    | Some _ -> invalid_arg ("Redefinition of a global variable: " ^ name)
+  in
+  Hashtbl.add named_values name the_var;
+  the_var
+;; *)
+
 let gen_astructure_item = function
   | Anf_str_eval expr -> gen_anf_expr expr
   | Anf_str_value (_, name, Anf_comp_expr (Comp_func (params, body))) ->
     gen_function name params body
-  | Anf_str_value (_, _, _) ->
-    (* gen variable *)
-    failwith "not implemented"
+  | Anf_str_value (_, name, expr) ->
+    (* let value = gen_anf_expr expr in
+    gen_variable name value *)
+    gen_function name [] expr
+  | _ -> failwith "not implemented"
 ;;
 
 let gen_program_ir (program : aprogram) (triple : string) =
