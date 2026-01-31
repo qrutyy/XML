@@ -5,4 +5,4 @@
 open Format
 
 (* gens program on LLMV IR from the ast *)
-val gen_program_ir : Middleend.Anf.aprogram -> string -> unit
+val gen_program_ir : Middleend.Anf.aprogram -> string -> string

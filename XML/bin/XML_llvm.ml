@@ -22,7 +22,7 @@ type options =
 (*     Compiler Entry Points       *)
 (* ------------------------------- *)
 
-let to_llvm_ir ast : string =
+let to_llvm_ir ast =
   let cc_program = Middleend.Cc.cc_program ast in
   let anf_ast = Middleend.Anf.anf_program cc_program in
   let ll_anf = Middleend.Ll.lambda_lift_program anf_ast in
@@ -39,7 +39,8 @@ let compile_and_write options source_code =
   let ast = Common.Parser.parse_str source_code in
   if options.show_ast
   then (
-    printf "%a\n" Common.Pprinter.pprint_program ast;
+    (* printf "%a\n" Common.Pprinter.pprint_program ast; *)
+    printf "%s\n" (Common.Ast.show_program ast);
     exit 0);
   let cc_ast = Middleend.Cc.cc_program ast in
   if options.show_cc
@@ -54,7 +55,8 @@ let compile_and_write options source_code =
   let anf_after_ll = Middleend.Ll.lambda_lift_program anf_ast in
   if options.show_ll
   then (
-    Middleend.Pprinter.print_anf_program std_formatter anf_after_ll;
+    (* Middleend.Pprinter.print_anf_program std_formatter anf_after_ll; *)
+    printf "%s\n" (Middleend.Anf.show_aprogram anf_after_ll);
     exit 0);
   let llvm_ir_code = to_llvm_ir ast in
   match options.output_file_name with
