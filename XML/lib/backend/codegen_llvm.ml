@@ -3,6 +3,9 @@
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 open Middleend.Anf
+open Common.Ast
+
+(* Don't forget about tagging ints *)
 
 let context = Llvm.global_context ()
 let i64_type = Llvm.i64_type context
@@ -11,16 +14,72 @@ let default_type = i64_type (* *)
 let ptr_type = Llvm.pointer_type context
 let builder = Llvm.builder context
 let the_module = Llvm.create_module context "main"
-let named_values : (string, Llvm.llvalue) Hashtbl.t = Hashtbl.create 16
+let named_values : (string, Llvm.llvalue) Hashtbl.t = Hashtbl.create 32
 
-(* don't forget about tagged integers *)
+module FuncTypeMap = struct
+  module K = struct
+    type t = ident
 
-let gen_im_expr_ir = function
+    let compare = Stdlib.compare
+  end
+
+  module M = Map.Make (K)
+
+  type t = Llvm.lltype M.t
+
+  let empty () : t = M.empty
+  let bind (t : t) (x : ident) (ll : Llvm.lltype) : t = M.add x ll t
+  let find (t : t) (x : ident) : Llvm.lltype option = M.find_opt x t
+  let keys = M.bindings
+end
+
+(* Return types from runtime.c *)
+let initial_arity_map =
+  let open FuncTypeMap in
+  let lfty = Llvm.function_type in
+  let arity_map = empty () in
+  let arity_map = bind arity_map "print_int" (lfty void_type [| i64_type |]) in
+  let arity_map = bind arity_map "alloc_block" (lfty i64_type [| i64_type |]) in
+  let arity_map =
+    bind arity_map "alloc_closure" (lfty i64_type [| i64_type; i64_type |])
+  in
+  let arity_map = bind arity_map "apply1" (lfty i64_type [| i64_type; i64_type |]) in
+  let arity_map = bind arity_map "print_gc_status" (lfty void_type [| void_type |]) in
+  let arity_map = bind arity_map "collect" (lfty void_type [| void_type |]) in
+  let arity_map = bind arity_map "create_tuple" (lfty i64_type [| i64_type |]) in
+  let arity_map = bind arity_map "field" (lfty i64_type [| i64_type; i64_type |]) in
+  arity_map
+;;
+
+let prefill_ftmap (arity_map0 : FuncTypeMap.t) (program : aprogram) : FuncTypeMap.t =
+  let typ argc = Llvm.function_type i64_type (Array.make argc i64_type) in
+  List.fold_left
+    (fun am -> function
+       | Anf_str_value (_rf, name, anf_expr) ->
+         (match anf_expr with
+          | Anf_let (_, _, Comp_func (ps, _), _) ->
+            FuncTypeMap.bind am name (typ (List.length ps))
+          | Anf_comp_expr (Comp_func (ps, _)) ->
+            FuncTypeMap.bind am name (typ (List.length ps))
+          | _ -> FuncTypeMap.bind am name (typ 0))
+       | _ -> am)
+    arity_map0
+    program
+;;
+
+let gen_im_expr_ir ftmap = function
   | Imm_num n -> Llvm.const_int i64_type n
   | Imm_ident id ->
     (match Hashtbl.find_opt named_values id with
      | Some v -> Llvm.build_load default_type v id builder
-     | None -> invalid_arg ("Name not bound: " ^ id))
+     | None ->
+       (match FuncTypeMap.find ftmap id with
+        | Some _ ->
+          (* create a pointer to the code of id and take its number of args
+            then create a closure and return created call to "alloc_closure"
+          *)
+          failwith "not impl"
+        | None -> invalid_arg ("Name not bound: " ^ id)))
 ;;
 
 let create_entry_alloca the_fun var_name =
@@ -28,11 +87,11 @@ let create_entry_alloca the_fun var_name =
   Llvm.build_alloca i64_type var_name builder
 ;;
 
-let rec gen_comp_expr_ir = function
-  | Comp_imm imm -> gen_im_expr_ir imm
+let rec gen_comp_expr_ir ftmap = function
+  | Comp_imm imm -> gen_im_expr_ir ftmap imm
   | Comp_binop (op, lhs, rhs) ->
-    let lhs_val = gen_im_expr_ir lhs in
-    let rhs_val = gen_im_expr_ir rhs in
+    let lhs_val = gen_im_expr_ir ftmap lhs in
+    let rhs_val = gen_im_expr_ir ftmap rhs in
     let build_oper, name =
       match op with
       | "+" -> Llvm.build_add, "addtmp"
@@ -59,23 +118,23 @@ let rec gen_comp_expr_ir = function
       then ()
       else invalid_arg ("Invalid parameter num for function: " ^ f)
     in
-    let arg_vals = Array.map gen_im_expr_ir (Array.of_list args) in
+    let arg_vals = Array.map (gen_im_expr_ir ftmap) (Array.of_list args) in
     let arg_types = Array.map Llvm.type_of arg_vals in
     let f_type = Llvm.function_type default_type arg_types in
     Llvm.build_call f_type f_val arg_vals "calltmp" builder
   | Comp_branch (cond, br_then, br_else) ->
-    let cv = gen_im_expr_ir cond in
+    let cv = gen_im_expr_ir ftmap cond in
     let zero = Llvm.const_int i64_type 0 in
     let cond_val = Llvm.build_icmp Llvm.Icmp.Ne cv zero "cond" builder in
     let start_bb = Llvm.insertion_block builder in
     let the_fun = Llvm.block_parent start_bb in
     let then_bb = Llvm.append_block context "then" the_fun in
     Llvm.position_at_end then_bb builder;
-    let then_val = gen_anf_expr br_then in
+    let then_val = gen_anf_expr ftmap br_then in
     let new_then_bb = Llvm.insertion_block builder in
     let else_bb = Llvm.append_block context "else" the_fun in
     Llvm.position_at_end else_bb builder;
-    let else_val = gen_anf_expr br_else in
+    let else_val = gen_anf_expr ftmap br_else in
     let new_else_bb = Llvm.insertion_block builder in
     let merge_bb = Llvm.append_block context "ifcont" the_fun in
     Llvm.position_at_end merge_bb builder;
@@ -89,20 +148,24 @@ let rec gen_comp_expr_ir = function
     let _ = Llvm.build_br merge_bb builder in
     Llvm.position_at_end merge_bb builder;
     phi
+  (* | Comp_alloc imms | Comp_tuple imms ->
+    let imm_vals = List.map (fun i -> gen_im_expr_ir ftmap i) imms in
+    Llvm.build_call ty fn imm_vals "tupletmp" builder in
+    failwith "a" *)
   | _ -> failwith "not implemented"
 
-and gen_anf_expr = function
-  | Anf_comp_expr comp -> gen_comp_expr_ir comp
+and gen_anf_expr ftmap = function
+  | Anf_comp_expr comp -> gen_comp_expr_ir ftmap comp
   | Anf_let (_, name, comp_expr, body) ->
-    let init_val = gen_comp_expr_ir comp_expr in
+    let init_val = gen_comp_expr_ir ftmap comp_expr in
     let the_fun = Llvm.block_parent (Llvm.insertion_block builder) in
     let alloca = create_entry_alloca the_fun name in
     let _ = Llvm.build_store init_val alloca builder in
     Hashtbl.add named_values name alloca;
-    gen_anf_expr body
+    gen_anf_expr ftmap body
 ;;
 
-let gen_function name (params : string list) body =
+let gen_function ftmap name params body =
   Hashtbl.clear named_values;
   let param_types = Array.map (fun _ -> default_type) (Array.of_list params) in
   let f_type = Llvm.function_type default_type param_types in
@@ -110,10 +173,10 @@ let gen_function name (params : string list) body =
     match Llvm.lookup_function name the_module with
     | None -> Llvm.declare_function name f_type the_module
     | Some f ->
-      if Int.(Array.length (Llvm.basic_blocks f) = 0)
+      if Array.length (Llvm.basic_blocks f) = 0
       then ()
       else invalid_arg ("Redefinition of function: " ^ name);
-      if Int.(Array.length (Llvm.params f) = List.length params)
+      if Array.length (Llvm.params f) = List.length params
       then ()
       else invalid_arg ("Redefinition of function with different number of args: " ^ name);
       f
@@ -135,15 +198,15 @@ let gen_function name (params : string list) body =
        Hashtbl.replace named_values name alloca)
     (Llvm.params the_fun);
   (* Need to check for error here *)
-  let ret_val = gen_anf_expr body in
+  let ret_val = gen_anf_expr ftmap body in
   let _ = Llvm.build_ret ret_val builder in
-  (match Llvm_analysis.verify_function the_fun with
+  (* (match Llvm_analysis.verify_function the_fun with
    | true -> ()
    | false ->
      Stdlib.Format.printf
        "invalid function generated\n%s\n"
        (Llvm.string_of_llvalue the_fun);
-     Llvm_analysis.assert_valid_function the_fun);
+     Llvm_analysis.assert_valid_function the_fun); *)
   the_fun
 ;;
 
@@ -158,22 +221,30 @@ let gen_function name (params : string list) body =
   the_var
 ;; *)
 
-let gen_astructure_item = function
-  | Anf_str_eval expr -> gen_anf_expr expr
+let gen_astructure_item ftmap = function
+  | Anf_str_eval expr -> gen_anf_expr ftmap expr
   | Anf_str_value (_, name, Anf_comp_expr (Comp_func (params, body))) ->
-    gen_function name params body
+    gen_function ftmap name params body
   | Anf_str_value (_, name, expr) ->
-    (* let value = gen_anf_expr expr in
+    (* let value = gen_anf_expr ftmap expr in
     gen_variable name value *)
-    gen_function name [] expr
-  | _ -> failwith "not implemented"
+    gen_function ftmap name [] expr
 ;;
 
 let gen_program_ir (program : aprogram) (triple : string) =
   Llvm.set_target_triple triple the_module;
   assert (Llvm_executionengine.initialize ());
-  let _the_execution_engine = Llvm_executionengine.create the_module in
-  let module LL = (val LL.make context builder the_module) in
-  let _ = List.map (fun item -> gen_astructure_item item) program in
+  let arity_map = prefill_ftmap initial_arity_map program in
+  let keys = FuncTypeMap.keys arity_map in
+  (* let program = List.rev program in *)
+  let _ = List.map (fun (n, ty) -> Llvm.declare_function n ty the_module) keys in
+  (* let _ = List.map (decl_builtin arity_map) builtins in *)
+  (* *)
+  (* List.fold_left
+    (fun armap_acc item ->
+      match item with
+      | Anf_str
+    ) arity_map program *)
+  let _ = List.map (fun item -> gen_astructure_item arity_map item) program in
   Llvm.string_of_llmodule the_module
 ;;
