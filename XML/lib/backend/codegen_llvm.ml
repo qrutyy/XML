@@ -30,28 +30,34 @@ module FuncMap = struct
   let empty () : t = M.empty
   let bind (t : t) (x : ident) (ll : Llvm.llvalue * Llvm.lltype) : t = M.add x ll t
   let find (t : t) (x : ident) : (Llvm.llvalue * Llvm.lltype) option = M.find_opt x t
+  let find_exn (t : t) (x : ident) : Llvm.llvalue * Llvm.lltype = M.find x t
   let keys = M.bindings
 end
+
+(* Return types from runtime.c *)
+let initial_fmap =
+  let decl fmap id retty argtyps =
+    let ftyp = Llvm.function_type retty argtyps in
+    let fval = Llvm.declare_function id ftyp the_module in
+    FuncMap.bind fmap id (fval, ftyp)
+  in
+  let fmap = FuncMap.empty () in
+  let fmap = decl fmap "print_int" void_type [| i64_type |] in
+  let fmap = decl fmap "alloc_block" i64_type [| i64_type |] in
+  let fmap = decl fmap "alloc_closure" i64_type [| ptr_type; i64_type |] in
+  let fmap = decl fmap "apply1" i64_type [| ptr_type; i64_type |] in
+  let fmap = decl fmap "print_gc_status" void_type [||] in
+  let fmap = decl fmap "collect" void_type [||] in
+  let fmap = decl fmap "create_tuple" ptr_type [| i64_type |] in
+  let fmap = decl fmap "field" i64_type [| i64_type; i64_type |] in
+  fmap
+;;
 
 let decl_and_bind fmap id retty argc =
   let argtyps = Array.make argc i64_type in
   let ftyp = Llvm.function_type retty argtyps in
   let fval = Llvm.declare_function id ftyp the_module in
   FuncMap.bind fmap id (fval, ftyp)
-;;
-
-(* Return types from runtime.c *)
-let initial_fmap =
-  let fmap = FuncMap.empty () in
-  let fmap = decl_and_bind fmap "print_int" void_type 1 in
-  let fmap = decl_and_bind fmap "alloc_block" i64_type 1 in
-  let fmap = decl_and_bind fmap "alloc_closure" i64_type 1 in
-  let fmap = decl_and_bind fmap "apply1" i64_type 2 in
-  let fmap = decl_and_bind fmap "print_gc_status" void_type 0 in
-  let fmap = decl_and_bind fmap "collect" void_type 0 in
-  let fmap = decl_and_bind fmap "create_tuple" i64_type 1 in
-  let fmap = decl_and_bind fmap "field" i64_type 2 in
-  fmap
 ;;
 
 let prefill_fmap (fmap0 : FuncMap.t) (program : aprogram) : FuncMap.t =
@@ -73,6 +79,13 @@ let prefill_fmap (fmap0 : FuncMap.t) (program : aprogram) : FuncMap.t =
     program
 ;;
 
+let build_alloc_closure fmap func =
+  let acval, actyp = FuncMap.find_exn fmap "alloc_closure" in
+  let argc = Array.length (Llvm.params func) in
+  let argc = Llvm.const_int i64_type argc in
+  Llvm.build_call actyp acval [| func; argc |] "closure_tmp" builder
+;;
+
 let gen_im_expr_ir fmap = function
   | Imm_num n -> Llvm.const_int i64_type n
   | Imm_ident id ->
@@ -80,18 +93,10 @@ let gen_im_expr_ir fmap = function
      | Some v -> Llvm.build_load default_type v id builder
      | None ->
        (match FuncMap.find fmap id with
-        | Some _ ->
-          (* create a pointer to the code of id and take its number of args
-            then create a closure and return created call to "alloc_closure"
+        | Some (fval, _) ->
+          (* return created call to "alloc_closure"
           *)
-          let _ =
-            match Llvm.lookup_function id the_module with
-            | Some _ -> failwith "not impl some _"
-            | None -> failwith "not impl none"
-          in
-          failwith "aaa"
-          (* in *)
-          (* let cptr = Llvm.build_pointercast "codeptrtmp" builder *)
+          build_alloc_closure fmap fval
         | None -> invalid_arg ("Name not bound: " ^ id)))
 ;;
 
@@ -130,6 +135,7 @@ let rec gen_comp_expr_ir fmap = function
       if Int.equal (List.length args) (Array.length (Llvm.params f_val))
       then ()
       else invalid_arg ("Invalid parameter num for function: " ^ f)
+      (* apply1 here *)
     in
     let arg_vals = Array.map (gen_im_expr_ir fmap) (Array.of_list args) in
     let arg_types = Array.map Llvm.type_of arg_vals in
@@ -161,10 +167,30 @@ let rec gen_comp_expr_ir fmap = function
     let _ = Llvm.build_br merge_bb builder in
     Llvm.position_at_end merge_bb builder;
     phi
-  (* | Comp_alloc imms | Comp_tuple imms ->
-    let imm_vals = List.map (fun i -> gen_im_expr_ir fmap i) imms in
-    Llvm.build_call ty fn imm_vals "tupletmp" builder in
-    failwith "a" *)
+  | Comp_alloc imms | Comp_tuple imms ->
+    let ctval, cttyp = FuncMap.find_exn fmap "create_tuple" in
+    let argc = List.length imms in
+    let argc = Llvm.const_int i64_type argc in
+    let ptr = Llvm.build_call cttyp ctval [| argc |] "tuple_tmp" builder in
+    let ptr_to_0 =
+      Llvm.build_gep
+        i64_type
+        ptr
+        [| Llvm.const_int i64_type 0 |]
+        "ptr_to_elem_tmp"
+        builder
+    in
+    ptr_to_0
+    (* TEST: STORE 42 IN THE FIRST POSITION SEGFAULT *)
+    (* Llvm.build_store (Llvm.const_int i64_type 42) ptr_to_0 builder *)
+    (* let _ = List.mapi
+      (fun i imm ->
+         let imval = gen_im_expr_ir fmap imm in
+         let mem = 
+         Llvm.build_store imval (ptr + 8) builder
+         )
+      imms in
+    ptr *)
   | _ -> failwith "not implemented"
 
 and gen_anf_expr fmap = function
@@ -213,13 +239,13 @@ let gen_function fmap name params body =
   (* Need to check for error here *)
   let ret_val = gen_anf_expr fmap body in
   let _ = Llvm.build_ret ret_val builder in
-  (* (match Llvm_analysis.verify_function the_fun with
+  (match Llvm_analysis.verify_function the_fun with
    | true -> ()
    | false ->
      Stdlib.Format.printf
        "invalid function generated\n%s\n"
        (Llvm.string_of_llvalue the_fun);
-     Llvm_analysis.assert_valid_function the_fun); *)
+     Llvm_analysis.assert_valid_function the_fun);
   the_fun
 ;;
 
