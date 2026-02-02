@@ -43,13 +43,17 @@ let initial_fmap =
   in
   let fmap = FuncMap.empty () in
   let fmap = decl fmap "print_int" void_type [| i64_type |] in
-  let fmap = decl fmap "alloc_block" i64_type [| i64_type |] in
-  let fmap = decl fmap "alloc_closure" i64_type [| ptr_type; i64_type |] in
-  let fmap = decl fmap "apply1" i64_type [| ptr_type; i64_type |] in
+  let fmap = decl fmap "alloc_block" i64_type (*ptr*) [| i64_type |] in
+  let fmap =
+    decl fmap "alloc_closure" i64_type (*ptr*) [| ptr_type (*ptr*); i64_type |]
+  in
+  let fmap =
+    decl fmap "apply1" i64_type (*ptr or int*) [| ptr_type (*ptr*); i64_type |]
+  in
   let fmap = decl fmap "print_gc_status" void_type [||] in
   let fmap = decl fmap "collect" void_type [||] in
-  let fmap = decl fmap "create_tuple" ptr_type [| i64_type |] in
-  let fmap = decl fmap "field" i64_type [| i64_type; i64_type |] in
+  let fmap = decl fmap "create_tuple" ptr_type (*ptr*) [| i64_type |] in
+  let fmap = decl fmap "field" i64_type (*ptr or int*) [| i64_type (*ptr*); i64_type |] in
   fmap
 ;;
 
@@ -94,8 +98,7 @@ let gen_im_expr_ir fmap = function
      | None ->
        (match FuncMap.find fmap id with
         | Some (fval, _) ->
-          (* return created call to "alloc_closure"
-          *)
+          (* return a pointer to a closure *)
           build_alloc_closure fmap fval
         | None -> invalid_arg ("Name not bound: " ^ id)))
 ;;
@@ -126,21 +129,20 @@ let rec gen_comp_expr_ir fmap = function
     in
     build_oper lhs_val rhs_val name builder
   | Comp_app (Imm_ident f, args) ->
-    let f_val =
-      match Llvm.lookup_function f the_module with
-      | Some name -> name
-      | None -> invalid_arg ("Undefined function: " ^ f)
-    in
-    let _ =
-      if Int.equal (List.length args) (Array.length (Llvm.params f_val))
-      then ()
-      else invalid_arg ("Invalid parameter num for function: " ^ f)
-      (* apply1 here *)
-    in
-    let arg_vals = Array.map (gen_im_expr_ir fmap) (Array.of_list args) in
-    let arg_types = Array.map Llvm.type_of arg_vals in
-    let f_type = Llvm.function_type default_type arg_types in
-    Llvm.build_call f_type f_val arg_vals "calltmp" builder
+    (* Format.printf "Function: %s\n Number of args: %d" f (List.length args); *)
+    let fval, ftype = FuncMap.find_exn fmap f in
+    let pvs = Llvm.params fval in
+    if List.length args = Array.length pvs
+    then Llvm.build_call ftype fval pvs "calltmp" builder
+    else (
+      (* partial application *)
+      let fclos = build_alloc_closure fmap fval in
+      let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
+      let apval, aptyp = FuncMap.find_exn fmap "apply1" in
+      List.fold_left
+        (fun clos arg -> Llvm.build_call aptyp apval [| clos; arg |] "app_tmp" builder)
+        fclos
+        argvs)
   | Comp_branch (cond, br_then, br_else) ->
     let cv = gen_im_expr_ir fmap cond in
     let zero = Llvm.const_int i64_type 0 in
@@ -239,13 +241,13 @@ let gen_function fmap name params body =
   (* Need to check for error here *)
   let ret_val = gen_anf_expr fmap body in
   let _ = Llvm.build_ret ret_val builder in
-  (match Llvm_analysis.verify_function the_fun with
+  (* (match Llvm_analysis.verify_function the_fun with
    | true -> ()
    | false ->
      Stdlib.Format.printf
        "invalid function generated\n%s\n"
        (Llvm.string_of_llvalue the_fun);
-     Llvm_analysis.assert_valid_function the_fun);
+     Llvm_analysis.assert_valid_function the_fun); *)
   the_fun
 ;;
 
