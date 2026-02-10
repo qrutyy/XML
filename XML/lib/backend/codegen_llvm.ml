@@ -164,25 +164,33 @@ let rec gen_comp_expr_ir fmap = function
     in
     build_oper lhs_val rhs_val name builder
   | Comp_app (Imm_ident f, args) ->
-    Format.printf "Function: %s\n Number of args: %d\n" f (List.length args);
-    (* let fval, ftype = FuncMap.find_exn fmap f in *)
-    let fval, ftype =
-      match FuncMap.find fmap f with
-      | Some (fv, ft, _) -> fv, ft
-      | _ -> failwith ("Couldn't find function " ^ f ^ " in fmap")
-    in
-    let pvs = Llvm.params fval in
-    if List.length args = Array.length pvs
-    then Llvm.build_call ftype fval pvs "calltmp" builder
-    else (
-      (* partial application *)
-      let fclos = build_alloc_closure fmap fval in
-      let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
-      let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
-      List.fold_left
-        (fun clos arg -> Llvm.build_call aptyp apval [| clos; arg |] "app_tmp" builder)
-        fclos
-        argvs)
+    Format.printf "Id: %s got called with %d args\n" f (List.length args);
+    (match FuncMap.find fmap f with
+     | Some (fval, ftype, _) ->
+       let pvs = Llvm.params fval in
+       if List.length args = Array.length pvs
+       then Llvm.build_call ftype fval pvs "calltmp" builder
+       else (
+         (* partial application *)
+         let fclos = build_alloc_closure fmap fval in
+         let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
+         let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
+         List.fold_left
+           (fun clos arg -> Llvm.build_call aptyp apval [| clos; arg |] "app_tmp" builder)
+           fclos
+           argvs)
+     | _ ->
+       (* maybe it's a closure in this scope *)
+       (match Hashtbl.find_opt named_values f with
+        | Some v ->
+          let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
+          let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
+          List.fold_left
+            (fun clos arg ->
+               Llvm.build_call aptyp apval [| clos; arg |] "app_tmp" builder)
+            v
+            argvs
+        | _ -> failwith ("Id: " ^ f ^ " not found")))
   | Comp_branch (cond, br_then, br_else) ->
     let cv = gen_im_expr_ir fmap cond in
     let zero = Llvm.const_int i64_type 0 in
