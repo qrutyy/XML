@@ -238,6 +238,16 @@ value create_tuple(int64_t n) {
     return (value)alloc_block(n);
 }
 
+value create_tuple_init(int64_t n, int64_t* init_arr) {
+    Block* tuple = create_tuple(n);
+
+    for (int i = 0; i < n; i++) {
+        tuple->elems[i] = init_arr[i];
+    }
+
+    return (value)tuple;
+}
+
 value field(value val, int64_t index) {
     if (IS_INT(val)) panic("field: attempt to access field of an integer");
     if (val == 0) panic("field: null pointer dereference");

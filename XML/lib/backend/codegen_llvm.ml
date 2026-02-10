@@ -9,7 +9,11 @@ open Common.Ast
 
 let context = Llvm.global_context ()
 let i64_type = Llvm.i64_type context
+let i32_type = Llvm.i32_type context
 let void_type = Llvm.void_type context
+let gcheader_type = Llvm.struct_type context [| i64_type |]
+let block_elms_type = Llvm.array_type i64_type 0
+let block_type = Llvm.struct_type context [| gcheader_type; i64_type; block_elms_type |]
 let default_type = i64_type (* *)
 let ptr_type = Llvm.pointer_type context
 let builder = Llvm.builder context
@@ -45,14 +49,17 @@ let initial_fmap =
   let fmap = decl fmap "print_int" void_type [| i64_type |] in
   let fmap = decl fmap "alloc_block" i64_type (*ptr*) [| i64_type |] in
   let fmap =
-    decl fmap "alloc_closure" i64_type (*ptr*) [| ptr_type (*ptr*); i64_type |]
+    decl fmap "alloc_closure" i64_type (*ptr*) [| i64_type (*ptr*); i64_type |]
   in
   let fmap =
-    decl fmap "apply1" i64_type (*ptr or int*) [| ptr_type (*ptr*); i64_type |]
+    decl fmap "apply1" i64_type (*ptr or int*) [| i64_type (*ptr*); i64_type |]
   in
   let fmap = decl fmap "print_gc_status" void_type [||] in
   let fmap = decl fmap "collect" void_type [||] in
-  let fmap = decl fmap "create_tuple" ptr_type (*ptr*) [| i64_type |] in
+  let fmap = decl fmap "create_tuple" i64_type (*ptr*) [| i64_type |] in
+  let fmap =
+    decl fmap "create_tuple_init" i64_type (*ptr*) [| i64_type; i64_type (*ptr*) |]
+  in
   let fmap = decl fmap "field" i64_type (*ptr or int*) [| i64_type (*ptr*); i64_type |] in
   fmap
 ;;
@@ -129,8 +136,13 @@ let rec gen_comp_expr_ir fmap = function
     in
     build_oper lhs_val rhs_val name builder
   | Comp_app (Imm_ident f, args) ->
-    (* Format.printf "Function: %s\n Number of args: %d" f (List.length args); *)
-    let fval, ftype = FuncMap.find_exn fmap f in
+    Format.printf "Function: %s\n Number of args: %d\n" f (List.length args);
+    (* let fval, ftype = FuncMap.find_exn fmap f in *)
+    let fval, ftype =
+      match FuncMap.find fmap f with
+      | Some (fv, ft) -> fv, ft
+      | _ -> failwith ("Couldn't find function " ^ f ^ " in fmap")
+    in
     let pvs = Llvm.params fval in
     if List.length args = Array.length pvs
     then Llvm.build_call ftype fval pvs "calltmp" builder
@@ -170,29 +182,27 @@ let rec gen_comp_expr_ir fmap = function
     Llvm.position_at_end merge_bb builder;
     phi
   | Comp_alloc imms | Comp_tuple imms ->
-    let ctval, cttyp = FuncMap.find_exn fmap "create_tuple" in
-    let argc = List.length imms in
-    let argc = Llvm.const_int i64_type argc in
-    let ptr = Llvm.build_call cttyp ctval [| argc |] "tuple_tmp" builder in
-    let ptr_to_0 =
-      Llvm.build_gep
-        i64_type
-        ptr
-        [| Llvm.const_int i64_type 0 |]
-        "ptr_to_elem_tmp"
-        builder
-    in
-    ptr_to_0
-    (* TEST: STORE 42 IN THE FIRST POSITION SEGFAULT *)
-    (* Llvm.build_store (Llvm.const_int i64_type 42) ptr_to_0 builder *)
-    (* let _ = List.mapi
-      (fun i imm ->
-         let imval = gen_im_expr_ir fmap imm in
-         let mem = 
-         Llvm.build_store imval (ptr + 8) builder
-         )
-      imms in
-    ptr *)
+    let ctval, cttyp = FuncMap.find_exn fmap "create_tuple_init" in
+    let argc = Llvm.const_int i64_type (List.length imms) in
+    (* let ret = Llvm.build_call cttyp ctval [| argc |] "tuple_ret" builder in *)
+    (* let ptr = Llvm.build_inttoptr ret ptr_type "tuple_ptr" builder in *)
+    let argv = List.map (fun im -> gen_im_expr_ir fmap im) imms in
+    let alloca = Llvm.build_array_alloca i64_type argc "tuple_vals_alloca" builder in
+    List.iteri
+      (fun i elem ->
+         let ptr_to_elem =
+           Llvm.build_gep
+             i64_type
+             alloca
+             [| Llvm.const_int i64_type i |]
+             "ptr_to_elem"
+             builder
+         in
+         let _ = Llvm.build_store elem ptr_to_elem builder in
+         ())
+      argv;
+    let alloca_as_i64 = Llvm.build_pointercast alloca i64_type "alloca_as_i64" builder in
+    Llvm.build_call cttyp ctval [| argc; alloca_as_i64 |] "tuple_tmp" builder
   | _ -> failwith "not implemented"
 
 and gen_anf_expr fmap = function
@@ -241,13 +251,13 @@ let gen_function fmap name params body =
   (* Need to check for error here *)
   let ret_val = gen_anf_expr fmap body in
   let _ = Llvm.build_ret ret_val builder in
-  (* (match Llvm_analysis.verify_function the_fun with
+  (match Llvm_analysis.verify_function the_fun with
    | true -> ()
    | false ->
      Stdlib.Format.printf
        "invalid function generated\n%s\n"
        (Llvm.string_of_llvalue the_fun);
-     Llvm_analysis.assert_valid_function the_fun); *)
+     Llvm_analysis.assert_valid_function the_fun);
   the_fun
 ;;
 
@@ -276,6 +286,12 @@ let gen_program_ir (program : aprogram) (triple : string) =
   Llvm.set_target_triple triple the_module;
   assert (Llvm_executionengine.initialize ());
   let fmap = prefill_fmap initial_fmap program in
+  let _ =
+    List.map
+      (fun (id, (ftyp, _)) ->
+         Format.printf "Id: %s Arity: %d\n" id (Array.length (Llvm.params ftyp)))
+      (FuncMap.keys fmap)
+  in
   let _ = List.map (fun item -> gen_astructure_item fmap item) program in
   Llvm.string_of_llmodule the_module
 ;;
