@@ -29,13 +29,43 @@ module FuncMap = struct
 
   module M = Map.Make (K)
 
-  type t = (Llvm.llvalue * Llvm.lltype) M.t
+  type status =
+    | User
+    | Lib
+
+  type t = (Llvm.llvalue * Llvm.lltype * status) M.t
 
   let empty () : t = M.empty
-  let bind (t : t) (x : ident) (ll : Llvm.llvalue * Llvm.lltype) : t = M.add x ll t
-  let find (t : t) (x : ident) : (Llvm.llvalue * Llvm.lltype) option = M.find_opt x t
-  let find_exn (t : t) (x : ident) : Llvm.llvalue * Llvm.lltype = M.find x t
+
+  let bind (t : t) (x : ident) (ll : Llvm.llvalue * Llvm.lltype * status) : t =
+    M.add x ll t
+  ;;
+
+  let find (t : t) (x : ident) : (Llvm.llvalue * Llvm.lltype * status) option =
+    M.find_opt x t
+  ;;
+
+  let find_exn (t : t) (x : ident) : Llvm.llvalue * Llvm.lltype * status = M.find x t
   let keys = M.bindings
+
+  let print_fmap (t : t) =
+    let _ =
+      List.map
+        (fun (id, (fval, _, s)) ->
+           let stat =
+             match s with
+             | User -> "user"
+             | Lib -> "lib"
+           in
+           Format.printf
+             "Id: %s Arity: %d Status: %s\n"
+             id
+             (Array.length (Llvm.params fval))
+             stat)
+        (keys t)
+    in
+    ()
+  ;;
 end
 
 (* Return types from runtime.c *)
@@ -43,7 +73,7 @@ let initial_fmap =
   let decl fmap id retty argtyps =
     let ftyp = Llvm.function_type retty argtyps in
     let fval = Llvm.declare_function id ftyp the_module in
-    FuncMap.bind fmap id (fval, ftyp)
+    FuncMap.bind fmap id (fval, ftyp, FuncMap.Lib)
   in
   let fmap = FuncMap.empty () in
   let fmap = decl fmap "print_int" void_type [| i64_type |] in
@@ -65,10 +95,14 @@ let initial_fmap =
 ;;
 
 let decl_and_bind fmap id retty argc =
-  let argtyps = Array.make argc i64_type in
-  let ftyp = Llvm.function_type retty argtyps in
-  let fval = Llvm.declare_function id ftyp the_module in
-  FuncMap.bind fmap id (fval, ftyp)
+  match FuncMap.find fmap id with
+  | Some (_, _, FuncMap.Lib) -> fmap
+  | _ when argc = 0 -> fmap
+  | _ ->
+    let argtyps = Array.make argc i64_type in
+    let ftyp = Llvm.function_type retty argtyps in
+    let fval = Llvm.declare_function id ftyp the_module in
+    FuncMap.bind fmap id (fval, ftyp, FuncMap.User)
 ;;
 
 let prefill_fmap (fmap0 : FuncMap.t) (program : aprogram) : FuncMap.t =
@@ -76,22 +110,16 @@ let prefill_fmap (fmap0 : FuncMap.t) (program : aprogram) : FuncMap.t =
     (fun fm -> function
        | Anf_str_value (_rf, name, anf_expr) ->
          (match anf_expr with
-          | Anf_let (_, _, Comp_func (ps, _), _)
-          (* FuncMap.bind am name (typ (List.length ps)) *)
-          (* decl_and_bind fm name i64_type (List.length ps) *)
-          | Anf_comp_expr (Comp_func (ps, _)) ->
+          | Anf_let (_, _, Comp_func (ps, _), _) | Anf_comp_expr (Comp_func (ps, _)) ->
             decl_and_bind fm name i64_type (List.length ps)
-            (* FuncMap.bind am name (typ (List.length ps)) *)
-          | _ ->
-            (* FuncMap.bind am name (typ 0) *)
-            decl_and_bind fm name i64_type 0)
+          | _ -> decl_and_bind fm name i64_type 0)
        | _ -> fm)
     fmap0
     program
 ;;
 
 let build_alloc_closure fmap func =
-  let acval, actyp = FuncMap.find_exn fmap "alloc_closure" in
+  let acval, actyp, _ = FuncMap.find_exn fmap "alloc_closure" in
   let argc = Array.length (Llvm.params func) in
   let argc = Llvm.const_int i64_type argc in
   Llvm.build_call actyp acval [| func; argc |] "closure_tmp" builder
@@ -104,7 +132,7 @@ let gen_im_expr_ir fmap = function
      | Some v -> Llvm.build_load default_type v id builder
      | None ->
        (match FuncMap.find fmap id with
-        | Some (fval, _) ->
+        | Some (fval, _, _) ->
           (* return a pointer to a closure *)
           build_alloc_closure fmap fval
         | None -> invalid_arg ("Name not bound: " ^ id)))
@@ -140,7 +168,7 @@ let rec gen_comp_expr_ir fmap = function
     (* let fval, ftype = FuncMap.find_exn fmap f in *)
     let fval, ftype =
       match FuncMap.find fmap f with
-      | Some (fv, ft) -> fv, ft
+      | Some (fv, ft, _) -> fv, ft
       | _ -> failwith ("Couldn't find function " ^ f ^ " in fmap")
     in
     let pvs = Llvm.params fval in
@@ -150,7 +178,7 @@ let rec gen_comp_expr_ir fmap = function
       (* partial application *)
       let fclos = build_alloc_closure fmap fval in
       let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
-      let apval, aptyp = FuncMap.find_exn fmap "apply1" in
+      let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
       List.fold_left
         (fun clos arg -> Llvm.build_call aptyp apval [| clos; arg |] "app_tmp" builder)
         fclos
@@ -182,7 +210,7 @@ let rec gen_comp_expr_ir fmap = function
     Llvm.position_at_end merge_bb builder;
     phi
   | Comp_alloc imms | Comp_tuple imms ->
-    let ctval, cttyp = FuncMap.find_exn fmap "create_tuple_init" in
+    let ctval, cttyp, _ = FuncMap.find_exn fmap "create_tuple_init" in
     let argc = Llvm.const_int i64_type (List.length imms) in
     (* let ret = Llvm.build_call cttyp ctval [| argc |] "tuple_ret" builder in *)
     (* let ptr = Llvm.build_inttoptr ret ptr_type "tuple_ptr" builder in *)
@@ -261,37 +289,32 @@ let gen_function fmap name params body =
   the_fun
 ;;
 
-(*
-   let gen_variable name value =
-  let the_var =
-    match Llvm.lookup_global name the_module with
-    | None -> Llvm.define_global name value the_module
-    | Some _ -> invalid_arg ("Redefinition of a global variable: " ^ name)
-  in
-  Hashtbl.add named_values name the_var;
-  the_var
-;; *)
-
 let gen_astructure_item fmap = function
   | Anf_str_eval expr -> gen_anf_expr fmap expr
   | Anf_str_value (_, name, Anf_comp_expr (Comp_func (params, body))) ->
     gen_function fmap name params body
   | Anf_str_value (_, name, expr) ->
-    (* let value = gen_anf_expr fmap expr in
-    gen_variable name value *)
-    gen_function fmap name [] expr
+    let main_fn =
+      match Llvm.lookup_function "main" the_module with
+      | Some fn -> fn
+      | _ -> failwith ("cannot generate value: " ^ name ^ ", main function not found")
+    in
+    Llvm.position_at_end (Llvm.entry_block main_fn) builder;
+    let value = gen_anf_expr fmap expr in
+    let alloca = create_entry_alloca main_fn name in
+    Hashtbl.add named_values name alloca;
+    Llvm.build_store value alloca builder
 ;;
 
 let gen_program_ir (program : aprogram) (triple : string) =
   Llvm.set_target_triple triple the_module;
   assert (Llvm_executionengine.initialize ());
+  let main_ty = Llvm.function_type i64_type [||] in
+  let main_fn = Llvm.define_function "main" main_ty the_module in
   let fmap = prefill_fmap initial_fmap program in
-  let _ =
-    List.map
-      (fun (id, (ftyp, _)) ->
-         Format.printf "Id: %s Arity: %d\n" id (Array.length (Llvm.params ftyp)))
-      (FuncMap.keys fmap)
-  in
+  FuncMap.print_fmap fmap;
   let _ = List.map (fun item -> gen_astructure_item fmap item) program in
+  Llvm.position_at_end (Llvm.entry_block main_fn) builder;
+  let _ = Llvm.build_ret (Llvm.const_int i64_type 0) builder in
   Llvm.string_of_llmodule the_module
 ;;
