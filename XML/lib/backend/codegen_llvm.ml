@@ -94,6 +94,14 @@ let initial_fmap =
   fmap
 ;;
 
+let build_call_mb_void ftype fval argvs name =
+  match Llvm.return_type ftype with
+  | ty when ty = void_type ->
+    let _ = Llvm.build_call ftype fval argvs "" builder in
+    Llvm.const_int i64_type 0
+  | _ -> Llvm.build_call ftype fval argvs name builder
+;;
+
 let decl_and_bind fmap id retty argc =
   match FuncMap.find fmap id with
   | Some (_, _, FuncMap.Lib) -> fmap
@@ -168,15 +176,16 @@ let rec gen_comp_expr_ir fmap = function
     (match FuncMap.find fmap f with
      | Some (fval, ftype, _) ->
        let pvs = Llvm.params fval in
+       let argvs = Array.map (fun arg -> gen_im_expr_ir fmap arg) (Array.of_list args) in
        if List.length args = Array.length pvs
-       then Llvm.build_call ftype fval pvs "calltmp" builder
+       then
+         build_call_mb_void ftype fval argvs "calltmp"
+         (* then Llvm.build_call ftype fval argvs "calltmp" builder *)
        else (
-         (* partial application *)
          let fclos = build_alloc_closure fmap fval in
-         let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
          let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
-         List.fold_left
-           (fun clos arg -> Llvm.build_call aptyp apval [| clos; arg |] "app_tmp" builder)
+         Array.fold_left
+           (fun clos arg -> build_call_mb_void aptyp apval [| clos; arg |] "app_tmp")
            fclos
            argvs)
      | _ ->
@@ -186,8 +195,7 @@ let rec gen_comp_expr_ir fmap = function
           let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
           let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
           List.fold_left
-            (fun clos arg ->
-               Llvm.build_call aptyp apval [| clos; arg |] "app_tmp" builder)
+            (fun clos arg -> build_call_mb_void aptyp apval [| clos; arg |] "app_tmp")
             v
             argvs
         | _ -> failwith ("Id: " ^ f ^ " not found")))
@@ -324,5 +332,8 @@ let gen_program_ir (program : aprogram) (triple : string) =
   let _ = List.map (fun item -> gen_astructure_item fmap item) program in
   Llvm.position_at_end (Llvm.entry_block main_fn) builder;
   let _ = Llvm.build_ret (Llvm.const_int i64_type 0) builder in
+  (* match Llvm_analysis.verify_module the_module with
+  | Some r -> failwith r
+  | None -> *)
   Llvm.string_of_llmodule the_module
 ;;
