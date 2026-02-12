@@ -239,7 +239,7 @@ value create_tuple(int64_t n) {
 }
 
 value create_tuple_init(int64_t n, int64_t* init_arr) {
-    Block* tuple = create_tuple(n);
+    Block* tuple = (Block*)create_tuple(n);
 
     for (int i = 0; i < n; i++) {
         tuple->elems[i] = init_arr[i];

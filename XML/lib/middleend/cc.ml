@@ -147,8 +147,8 @@ let rec closure_expr toplvl_set env expr =
         patterns
     in
     let free_vars = free_vars_in fun_bound_vars body in
-    (* let captured_vars = SSet.diff free_vars toplvl_set in *)
-    let captured_vars = SSet.filter (fun v -> not (List.mem v std_lib_names)) free_vars in
+    let captured_vars = SSet.diff free_vars toplvl_set in
+    (* let captured_vars = SSet.filter (fun v -> not (List.mem v std_lib_names)) free_vars in *)
     let captured_vars_list = SSet.elements captured_vars in
     let new_pats_for_capture = List.map (fun v -> Pat_var v) captured_vars_list in
     let saturated_patterns = new_pats_for_capture @ patterns in
@@ -209,10 +209,10 @@ and transform_bindings toplvl_set env rec_flag bindings =
         if rec_flag = Recursive then SSet.add v bound_in_fun else bound_in_fun
       in
       let free_vars = free_vars_in bound_for_body body in
-      (* let captured_vars = SSet.diff free_vars toplvl_set in *)
-      let captured_vars =
+      let captured_vars = SSet.diff free_vars toplvl_set in
+      (* let captured_vars =
         SSet.filter (fun v -> not (List.mem v std_lib_names)) free_vars
-      in
+      in *)
       let captured_vars_list = SSet.elements captured_vars in
       let new_pats_for_capture = List.map (fun v -> Pat_var v) captured_vars_list in
       let saturated_patterns = new_pats_for_capture @ patterns in

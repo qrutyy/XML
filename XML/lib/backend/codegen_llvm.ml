@@ -172,7 +172,7 @@ let rec gen_comp_expr_ir fmap = function
     in
     build_oper lhs_val rhs_val name builder
   | Comp_app (Imm_ident f, args) ->
-    Format.printf "Id: %s got called with %d args\n" f (List.length args);
+    (* Format.printf "Id: %s got called with %d args\n" f (List.length args); *)
     (match FuncMap.find fmap f with
      | Some (fval, ftype, _) ->
        let pvs = Llvm.params fval in
@@ -335,7 +335,7 @@ let gen_program_ir (program : aprogram) (triple : string) =
   let main_ty = Llvm.function_type i64_type [||] in
   let main_fn = Llvm.define_function "main" main_ty the_module in
   let fmap = prefill_fmap initial_fmap program in
-  FuncMap.print_fmap fmap;
+  (* FuncMap.print_fmap fmap; *)
   let _ = List.map (fun item -> gen_astructure_item fmap item) program in
   Llvm.position_at_end (Llvm.entry_block main_fn) builder;
   let _ = Llvm.build_ret (Llvm.const_int i64_type 0) builder in
