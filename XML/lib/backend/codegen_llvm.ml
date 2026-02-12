@@ -199,6 +199,7 @@ let rec gen_comp_expr_ir fmap = function
             v
             argvs
         | _ -> failwith ("Id: " ^ f ^ " not found")))
+  | Comp_app (Imm_num _, _) -> failwith "cannot apply number as a function"
   | Comp_branch (cond, br_then, br_else) ->
     let cv = gen_im_expr_ir fmap cond in
     let zero = Llvm.const_int i64_type 0 in
@@ -247,7 +248,13 @@ let rec gen_comp_expr_ir fmap = function
       argv;
     let alloca_as_i64 = Llvm.build_pointercast alloca i64_type "alloca_as_i64" builder in
     Llvm.build_call cttyp ctval [| argc; alloca_as_i64 |] "tuple_tmp" builder
-  | _ -> failwith "not implemented"
+  | Comp_load (imexpr, offset) ->
+    (*addr of the tuple *)
+    let vbase = gen_im_expr_ir fmap imexpr in
+    let voffst = Llvm.const_int i64_type offset in
+    let fifn, fity, _ = FuncMap.find_exn fmap "field" in
+    Llvm.build_call fity fifn [| vbase; voffst |] "load_tmp" builder
+  | Comp_func (_, _) -> failwith "func are not implemented yet"
 
 and gen_anf_expr fmap = function
   | Anf_comp_expr comp -> gen_comp_expr_ir fmap comp
