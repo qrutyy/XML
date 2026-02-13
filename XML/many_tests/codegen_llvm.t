@@ -225,7 +225,6 @@
     %t_51 = load i64, ptr %t_5, align 4
     %cond = icmp ne i64 %t_51, 0
     br i1 %cond, label %then, label %else
-    ret i64 0
   
   then:                                             ; preds = %entry
     store i1 false, ptr %t_6, align 1
@@ -280,6 +279,7 @@
     store i64 %calltmp, ptr %t_13, align 4
     %t_1320 = load i64, ptr %t_13, align 4
     store i64 %t_1320, ptr %main, align 4
+    ret i64 0
   }
   
   define i64 @large(i64 %x) {
@@ -351,12 +351,13 @@
     %t_3 = alloca i64, align 8
     %partialapp_sum = alloca i64, align 8
     %t_2 = alloca i64, align 8
-    %closure_tmp = call i64 @alloc_closure(ptr @simplesum, i64 2)
+    %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @simplesum to i64), i64 2)
     %app_tmp = call i64 @apply1(i64 %closure_tmp, i64 5)
     store i64 %app_tmp, ptr %t_2, align 4
     %t_21 = load i64, ptr %t_2, align 4
     store i64 %t_21, ptr %partialapp_sum, align 4
-    %app_tmp2 = call i64 @apply1(ptr %partialapp_sum, i64 5)
+    %clos_as_i64 = ptrtoint ptr %partialapp_sum to i64
+    %app_tmp2 = call i64 @apply1(i64 %clos_as_i64, i64 5)
     store i64 %app_tmp2, ptr %t_3, align 4
     %t_33 = load i64, ptr %t_3, align 4
     call void @print_int(i64 %t_33)
@@ -383,29 +384,318 @@
 
 ====================== CPS Factorial ======================
   $ ../bin/XML_llvm.exe -fromfile manytests/typed/010faccps_ll.ml -o 010faccps_ll.s
-  Call parameter type does not match function signature!
-    %k2 = alloca i64, align 8
-   i64  %app_tmp = call i64 @apply1(ptr %k2, i64 %t_16)
-  LLVM ERROR: Broken function found, compilation aborted!
-  Aborted (core dumped)
-  [134]
 
   $ cat 010faccps_ll.s
-  cat: 010faccps_ll.s: No such file or directory
-  [1]
+  ; ModuleID = 'main'
+  source_filename = "main"
+  target triple = "x86_64-pc-linux-gnu"
+  
+  declare void @print_int(i64)
+  
+  declare i64 @alloc_block(i64)
+  
+  declare i64 @alloc_closure(i64, i64)
+  
+  declare i64 @apply1(i64, i64)
+  
+  declare void @print_gc_status()
+  
+  declare void @collect()
+  
+  declare i64 @create_tuple(i64)
+  
+  declare i64 @create_tuple_init(i64, i64)
+  
+  declare i64 @field(i64, i64)
+  
+  define i64 @main() {
+  entry:
+    %main = alloca i64, align 8
+    %t_15 = alloca i64, align 8
+    %t_14 = alloca i64, align 8
+    %t_13 = alloca i64, align 8
+    %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @fac_cps to i64), i64 2)
+    %app_tmp = call i64 @apply1(i64 %closure_tmp, i64 4)
+    store i64 %app_tmp, ptr %t_13, align 4
+    %closure_tmp1 = call i64 @alloc_closure(i64 ptrtoint (ptr @id to i64), i64 1)
+    %clos_as_i64 = ptrtoint ptr %t_13 to i64
+    %app_tmp2 = call i64 @apply1(i64 %clos_as_i64, i64 %closure_tmp1)
+    store i64 %app_tmp2, ptr %t_14, align 4
+    %t_143 = load i64, ptr %t_14, align 4
+    call void @print_int(i64 %t_143)
+    store i64 0, ptr %t_15, align 4
+    store i64 0, ptr %main, align 4
+    ret i64 0
+  }
+  
+  define i64 @id(i64 %x) {
+  entry:
+    %x1 = alloca i64, align 8
+    store i64 %x, ptr %x1, align 4
+    %x2 = load i64, ptr %x1, align 4
+    ret i64 %x2
+  }
+  
+  define i64 @fresh_1(i64 %n, i64 %k, i64 %p) {
+  entry:
+    %t_2 = alloca i64, align 8
+    %t_1 = alloca i64, align 8
+    %p3 = alloca i64, align 8
+    %k2 = alloca i64, align 8
+    %n1 = alloca i64, align 8
+    store i64 %n, ptr %n1, align 4
+    store i64 %k, ptr %k2, align 4
+    store i64 %p, ptr %p3, align 4
+    %p4 = load i64, ptr %p3, align 4
+    %n5 = load i64, ptr %n1, align 4
+    %multmp = mul i64 %p4, %n5
+    store i64 %multmp, ptr %t_1, align 4
+    %t_16 = load i64, ptr %t_1, align 4
+    %clos_as_i64 = ptrtoint ptr %k2 to i64
+    %app_tmp = call i64 @apply1(i64 %clos_as_i64, i64 %t_16)
+    store i64 %app_tmp, ptr %t_2, align 4
+    %t_27 = load i64, ptr %t_2, align 4
+    ret i64 %t_27
+  }
+  
+  define i64 @fac_cps(i64 %n, i64 %k) {
+  entry:
+    %t_11 = alloca i64, align 8
+    %t_10 = alloca i64, align 8
+    %t_9 = alloca i64, align 8
+    %t_8 = alloca i64, align 8
+    %t_7 = alloca i64, align 8
+    %t_6 = alloca i64, align 8
+    %t_5 = alloca i64, align 8
+    %t_4 = alloca i64, align 8
+    %k2 = alloca i64, align 8
+    %n1 = alloca i64, align 8
+    store i64 %n, ptr %n1, align 4
+    store i64 %k, ptr %k2, align 4
+    %n3 = load i64, ptr %n1, align 4
+    %eqtmp = icmp eq i64 %n3, 1
+    store i1 %eqtmp, ptr %t_4, align 1
+    %t_44 = load i64, ptr %t_4, align 4
+    %cond = icmp ne i64 %t_44, 0
+    br i1 %cond, label %then, label %else
+  
+  then:                                             ; preds = %entry
+    %clos_as_i64 = ptrtoint ptr %k2 to i64
+    %app_tmp = call i64 @apply1(i64 %clos_as_i64, i64 1)
+    store i64 %app_tmp, ptr %t_5, align 4
+    %t_55 = load i64, ptr %t_5, align 4
+    br label %ifcont
+  
+  else:                                             ; preds = %entry
+    %n6 = load i64, ptr %n1, align 4
+    %subtmp = sub i64 %n6, 1
+    store i64 %subtmp, ptr %t_6, align 4
+    %t_67 = load i64, ptr %t_6, align 4
+    %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @fac_cps to i64), i64 2)
+    %app_tmp8 = call i64 @apply1(i64 %closure_tmp, i64 %t_67)
+    store i64 %app_tmp8, ptr %t_7, align 4
+    %n9 = load i64, ptr %n1, align 4
+    %closure_tmp10 = call i64 @alloc_closure(i64 ptrtoint (ptr @fresh_1 to i64), i64 3)
+    %app_tmp11 = call i64 @apply1(i64 %closure_tmp10, i64 %n9)
+    store i64 %app_tmp11, ptr %t_8, align 4
+    %k12 = load i64, ptr %k2, align 4
+    %clos_as_i6413 = ptrtoint ptr %t_8 to i64
+    %app_tmp14 = call i64 @apply1(i64 %clos_as_i6413, i64 %k12)
+    store i64 %app_tmp14, ptr %t_9, align 4
+    %t_915 = load i64, ptr %t_9, align 4
+    %clos_as_i6416 = ptrtoint ptr %t_7 to i64
+    %app_tmp17 = call i64 @apply1(i64 %clos_as_i6416, i64 %t_915)
+    store i64 %app_tmp17, ptr %t_10, align 4
+    %t_1018 = load i64, ptr %t_10, align 4
+    br label %ifcont
+  
+  ifcont:                                           ; preds = %else, %then
+    %iftmp = phi i64 [ %t_55, %then ], [ %t_1018, %else ]
+    store i64 %iftmp, ptr %t_11, align 4
+    %t_1119 = load i64, ptr %t_11, align 4
+    ret i64 %t_1119
+  }
 
 ====================== CPS Fibbo ======================
   $ ../bin/XML_llvm.exe -fromfile manytests/typed/010fibcps_ll.ml -o 010fibcps_ll.s
-  Call parameter type does not match function signature!
-    %k2 = alloca i64, align 8
-   i64  %app_tmp = call i64 @apply1(ptr %k2, i64 %t_16)
-  LLVM ERROR: Broken function found, compilation aborted!
-  Aborted (core dumped)
-  [134]
 
   $ cat 010fibcps_ll.s
-  cat: 010fibcps_ll.s: No such file or directory
-  [1]
+  ; ModuleID = 'main'
+  source_filename = "main"
+  target triple = "x86_64-pc-linux-gnu"
+  
+  declare void @print_int(i64)
+  
+  declare i64 @alloc_block(i64)
+  
+  declare i64 @alloc_closure(i64, i64)
+  
+  declare i64 @apply1(i64, i64)
+  
+  declare void @print_gc_status()
+  
+  declare void @collect()
+  
+  declare i64 @create_tuple(i64)
+  
+  declare i64 @create_tuple_init(i64, i64)
+  
+  declare i64 @field(i64, i64)
+  
+  define i64 @main() {
+  entry:
+    %main = alloca i64, align 8
+    %z = alloca i64, align 8
+    %t_22 = alloca i64, align 8
+    %t_21 = alloca i64, align 8
+    %t_20 = alloca i64, align 8
+    %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @fib to i64), i64 2)
+    %app_tmp = call i64 @apply1(i64 %closure_tmp, i64 6)
+    store i64 %app_tmp, ptr %t_20, align 4
+    %closure_tmp1 = call i64 @alloc_closure(i64 ptrtoint (ptr @id to i64), i64 1)
+    %clos_as_i64 = ptrtoint ptr %t_20 to i64
+    %app_tmp2 = call i64 @apply1(i64 %clos_as_i64, i64 %closure_tmp1)
+    store i64 %app_tmp2, ptr %t_21, align 4
+    %t_213 = load i64, ptr %t_21, align 4
+    call void @print_int(i64 %t_213)
+    store i64 0, ptr %t_22, align 4
+    %t_224 = load i64, ptr %t_22, align 4
+    store i64 %t_224, ptr %z, align 4
+    store i64 0, ptr %main, align 4
+    ret i64 0
+  }
+  
+  define i64 @id(i64 %x) {
+  entry:
+    %x1 = alloca i64, align 8
+    store i64 %x, ptr %x1, align 4
+    %x2 = load i64, ptr %x1, align 4
+    ret i64 %x2
+  }
+  
+  define i64 @fresh_2(i64 %p1, i64 %k, i64 %p2) {
+  entry:
+    %t_2 = alloca i64, align 8
+    %t_1 = alloca i64, align 8
+    %p23 = alloca i64, align 8
+    %k2 = alloca i64, align 8
+    %p11 = alloca i64, align 8
+    store i64 %p1, ptr %p11, align 4
+    store i64 %k, ptr %k2, align 4
+    store i64 %p2, ptr %p23, align 4
+    %p14 = load i64, ptr %p11, align 4
+    %p25 = load i64, ptr %p23, align 4
+    %addtmp = add i64 %p14, %p25
+    store i64 %addtmp, ptr %t_1, align 4
+    %t_16 = load i64, ptr %t_1, align 4
+    %clos_as_i64 = ptrtoint ptr %k2 to i64
+    %app_tmp = call i64 @apply1(i64 %clos_as_i64, i64 %t_16)
+    store i64 %app_tmp, ptr %t_2, align 4
+    %t_27 = load i64, ptr %t_2, align 4
+    ret i64 %t_27
+  }
+  
+  define i64 @fresh_1(i64 %n, i64 %k, i64 %fib, i64 %p1) {
+  entry:
+    %t_8 = alloca i64, align 8
+    %t_7 = alloca i64, align 8
+    %t_6 = alloca i64, align 8
+    %t_5 = alloca i64, align 8
+    %t_4 = alloca i64, align 8
+    %p14 = alloca i64, align 8
+    %fib3 = alloca i64, align 8
+    %k2 = alloca i64, align 8
+    %n1 = alloca i64, align 8
+    store i64 %n, ptr %n1, align 4
+    store i64 %k, ptr %k2, align 4
+    store i64 %fib, ptr %fib3, align 4
+    store i64 %p1, ptr %p14, align 4
+    %n5 = load i64, ptr %n1, align 4
+    %subtmp = sub i64 %n5, 2
+    store i64 %subtmp, ptr %t_4, align 4
+    %t_46 = load i64, ptr %t_4, align 4
+    %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @fib to i64), i64 2)
+    %app_tmp = call i64 @apply1(i64 %closure_tmp, i64 %t_46)
+    store i64 %app_tmp, ptr %t_5, align 4
+    %p17 = load i64, ptr %p14, align 4
+    %closure_tmp8 = call i64 @alloc_closure(i64 ptrtoint (ptr @fresh_2 to i64), i64 3)
+    %app_tmp9 = call i64 @apply1(i64 %closure_tmp8, i64 %p17)
+    store i64 %app_tmp9, ptr %t_6, align 4
+    %k10 = load i64, ptr %k2, align 4
+    %clos_as_i64 = ptrtoint ptr %t_6 to i64
+    %app_tmp11 = call i64 @apply1(i64 %clos_as_i64, i64 %k10)
+    store i64 %app_tmp11, ptr %t_7, align 4
+    %t_712 = load i64, ptr %t_7, align 4
+    %clos_as_i6413 = ptrtoint ptr %t_5 to i64
+    %app_tmp14 = call i64 @apply1(i64 %clos_as_i6413, i64 %t_712)
+    store i64 %app_tmp14, ptr %t_8, align 4
+    %t_815 = load i64, ptr %t_8, align 4
+    ret i64 %t_815
+  }
+  
+  define i64 @fib(i64 %n, i64 %k) {
+  entry:
+    %t_18 = alloca i64, align 8
+    %t_17 = alloca i64, align 8
+    %t_16 = alloca i64, align 8
+    %t_15 = alloca i64, align 8
+    %t_14 = alloca i64, align 8
+    %t_13 = alloca i64, align 8
+    %t_12 = alloca i64, align 8
+    %t_11 = alloca i64, align 8
+    %t_10 = alloca i64, align 8
+    %k2 = alloca i64, align 8
+    %n1 = alloca i64, align 8
+    store i64 %n, ptr %n1, align 4
+    store i64 %k, ptr %k2, align 4
+    %n3 = load i64, ptr %n1, align 4
+    %slttmp = icmp slt i64 %n3, 2
+    store i1 %slttmp, ptr %t_10, align 1
+    %t_104 = load i64, ptr %t_10, align 4
+    %cond = icmp ne i64 %t_104, 0
+    br i1 %cond, label %then, label %else
+  
+  then:                                             ; preds = %entry
+    %n5 = load i64, ptr %n1, align 4
+    %clos_as_i64 = ptrtoint ptr %k2 to i64
+    %app_tmp = call i64 @apply1(i64 %clos_as_i64, i64 %n5)
+    store i64 %app_tmp, ptr %t_11, align 4
+    %t_116 = load i64, ptr %t_11, align 4
+    br label %ifcont
+  
+  else:                                             ; preds = %entry
+    %n7 = load i64, ptr %n1, align 4
+    %subtmp = sub i64 %n7, 1
+    store i64 %subtmp, ptr %t_12, align 4
+    %t_128 = load i64, ptr %t_12, align 4
+    %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @fib to i64), i64 2)
+    %app_tmp9 = call i64 @apply1(i64 %closure_tmp, i64 %t_128)
+    store i64 %app_tmp9, ptr %t_13, align 4
+    %n10 = load i64, ptr %n1, align 4
+    %closure_tmp11 = call i64 @alloc_closure(i64 ptrtoint (ptr @fresh_1 to i64), i64 4)
+    %app_tmp12 = call i64 @apply1(i64 %closure_tmp11, i64 %n10)
+    store i64 %app_tmp12, ptr %t_14, align 4
+    %k13 = load i64, ptr %k2, align 4
+    %clos_as_i6414 = ptrtoint ptr %t_14 to i64
+    %app_tmp15 = call i64 @apply1(i64 %clos_as_i6414, i64 %k13)
+    store i64 %app_tmp15, ptr %t_15, align 4
+    %closure_tmp16 = call i64 @alloc_closure(i64 ptrtoint (ptr @fib to i64), i64 2)
+    %clos_as_i6417 = ptrtoint ptr %t_15 to i64
+    %app_tmp18 = call i64 @apply1(i64 %clos_as_i6417, i64 %closure_tmp16)
+    store i64 %app_tmp18, ptr %t_16, align 4
+    %t_1619 = load i64, ptr %t_16, align 4
+    %clos_as_i6420 = ptrtoint ptr %t_13 to i64
+    %app_tmp21 = call i64 @apply1(i64 %clos_as_i6420, i64 %t_1619)
+    store i64 %app_tmp21, ptr %t_17, align 4
+    %t_1722 = load i64, ptr %t_17, align 4
+    br label %ifcont
+  
+  ifcont:                                           ; preds = %else, %then
+    %iftmp = phi i64 [ %t_116, %then ], [ %t_1722, %else ]
+    store i64 %iftmp, ptr %t_18, align 4
+    %t_1823 = load i64, ptr %t_18, align 4
+    ret i64 %t_1823
+  }
 
   $ ../bin/XML_llvm.exe -fromfile manytests/typed/004manyargs.ml -o 004manyargs.s
 
@@ -453,45 +743,58 @@
     %t_19 = alloca i64, align 8
     %t_18 = alloca i64, align 8
     %t_17 = alloca i64, align 8
-    %closure_tmp = call i64 @alloc_closure(ptr @test10, i64 10)
+    %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @test10 to i64), i64 10)
     %calltmp = call i64 @wrap(i64 %closure_tmp)
     store i64 %calltmp, ptr %t_17, align 4
-    %app_tmp = call i64 @apply1(ptr %t_17, i64 1)
+    %clos_as_i64 = ptrtoint ptr %t_17 to i64
+    %app_tmp = call i64 @apply1(i64 %clos_as_i64, i64 1)
     store i64 %app_tmp, ptr %t_18, align 4
-    %app_tmp1 = call i64 @apply1(ptr %t_18, i64 10)
-    store i64 %app_tmp1, ptr %t_19, align 4
-    %app_tmp2 = call i64 @apply1(ptr %t_19, i64 100)
-    store i64 %app_tmp2, ptr %t_20, align 4
-    %app_tmp3 = call i64 @apply1(ptr %t_20, i64 1000)
-    store i64 %app_tmp3, ptr %t_21, align 4
-    %app_tmp4 = call i64 @apply1(ptr %t_21, i64 10000)
-    store i64 %app_tmp4, ptr %t_22, align 4
-    %app_tmp5 = call i64 @apply1(ptr %t_22, i64 100000)
-    store i64 %app_tmp5, ptr %t_23, align 4
-    %app_tmp6 = call i64 @apply1(ptr %t_23, i64 1000000)
-    store i64 %app_tmp6, ptr %t_24, align 4
-    %app_tmp7 = call i64 @apply1(ptr %t_24, i64 10000000)
-    store i64 %app_tmp7, ptr %t_25, align 4
-    %app_tmp8 = call i64 @apply1(ptr %t_25, i64 100000000)
-    store i64 %app_tmp8, ptr %t_26, align 4
-    %app_tmp9 = call i64 @apply1(ptr %t_26, i64 1000000000)
-    store i64 %app_tmp9, ptr %t_27, align 4
-    %t_2710 = load i64, ptr %t_27, align 4
-    store i64 %t_2710, ptr %rez, align 4
-    %rez11 = load i64, ptr %rez, align 4
-    call void @print_int(i64 %rez11)
+    %clos_as_i641 = ptrtoint ptr %t_18 to i64
+    %app_tmp2 = call i64 @apply1(i64 %clos_as_i641, i64 10)
+    store i64 %app_tmp2, ptr %t_19, align 4
+    %clos_as_i643 = ptrtoint ptr %t_19 to i64
+    %app_tmp4 = call i64 @apply1(i64 %clos_as_i643, i64 100)
+    store i64 %app_tmp4, ptr %t_20, align 4
+    %clos_as_i645 = ptrtoint ptr %t_20 to i64
+    %app_tmp6 = call i64 @apply1(i64 %clos_as_i645, i64 1000)
+    store i64 %app_tmp6, ptr %t_21, align 4
+    %clos_as_i647 = ptrtoint ptr %t_21 to i64
+    %app_tmp8 = call i64 @apply1(i64 %clos_as_i647, i64 10000)
+    store i64 %app_tmp8, ptr %t_22, align 4
+    %clos_as_i649 = ptrtoint ptr %t_22 to i64
+    %app_tmp10 = call i64 @apply1(i64 %clos_as_i649, i64 100000)
+    store i64 %app_tmp10, ptr %t_23, align 4
+    %clos_as_i6411 = ptrtoint ptr %t_23 to i64
+    %app_tmp12 = call i64 @apply1(i64 %clos_as_i6411, i64 1000000)
+    store i64 %app_tmp12, ptr %t_24, align 4
+    %clos_as_i6413 = ptrtoint ptr %t_24 to i64
+    %app_tmp14 = call i64 @apply1(i64 %clos_as_i6413, i64 10000000)
+    store i64 %app_tmp14, ptr %t_25, align 4
+    %clos_as_i6415 = ptrtoint ptr %t_25 to i64
+    %app_tmp16 = call i64 @apply1(i64 %clos_as_i6415, i64 100000000)
+    store i64 %app_tmp16, ptr %t_26, align 4
+    %clos_as_i6417 = ptrtoint ptr %t_26 to i64
+    %app_tmp18 = call i64 @apply1(i64 %clos_as_i6417, i64 1000000000)
+    store i64 %app_tmp18, ptr %t_27, align 4
+    %t_2719 = load i64, ptr %t_27, align 4
+    store i64 %t_2719, ptr %rez, align 4
+    %rez20 = load i64, ptr %rez, align 4
+    call void @print_int(i64 %rez20)
     store i64 0, ptr %t_28, align 4
-    %closure_tmp12 = call i64 @alloc_closure(ptr @test3, i64 3)
-    %calltmp13 = call i64 @wrap(i64 %closure_tmp12)
-    store i64 %calltmp13, ptr %t_29, align 4
-    %app_tmp14 = call i64 @apply1(ptr %t_29, i64 1)
-    store i64 %app_tmp14, ptr %t_30, align 4
-    %app_tmp15 = call i64 @apply1(ptr %t_30, i64 10)
-    store i64 %app_tmp15, ptr %t_31, align 4
-    %app_tmp16 = call i64 @apply1(ptr %t_31, i64 100)
-    store i64 %app_tmp16, ptr %t_32, align 4
-    %t_3217 = load i64, ptr %t_32, align 4
-    store i64 %t_3217, ptr %temp2, align 4
+    %closure_tmp21 = call i64 @alloc_closure(i64 ptrtoint (ptr @test3 to i64), i64 3)
+    %calltmp22 = call i64 @wrap(i64 %closure_tmp21)
+    store i64 %calltmp22, ptr %t_29, align 4
+    %clos_as_i6423 = ptrtoint ptr %t_29 to i64
+    %app_tmp24 = call i64 @apply1(i64 %clos_as_i6423, i64 1)
+    store i64 %app_tmp24, ptr %t_30, align 4
+    %clos_as_i6425 = ptrtoint ptr %t_30 to i64
+    %app_tmp26 = call i64 @apply1(i64 %clos_as_i6425, i64 10)
+    store i64 %app_tmp26, ptr %t_31, align 4
+    %clos_as_i6427 = ptrtoint ptr %t_31 to i64
+    %app_tmp28 = call i64 @apply1(i64 %clos_as_i6427, i64 100)
+    store i64 %app_tmp28, ptr %t_32, align 4
+    %t_3229 = load i64, ptr %t_32, align 4
+    store i64 %t_3229, ptr %temp2, align 4
     store i64 0, ptr %main, align 4
     ret i64 0
   }
@@ -669,10 +972,11 @@
     %p = alloca i64, align 8
     %t_3 = alloca i64, align 8
     %t_2 = alloca i64, align 8
-    %closure_tmp = call i64 @alloc_closure(ptr @make_pair, i64 2)
+    %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @make_pair to i64), i64 2)
     %app_tmp = call i64 @apply1(i64 %closure_tmp, i64 10)
     store i64 %app_tmp, ptr %t_2, align 4
-    %app_tmp1 = call i64 @apply1(ptr %t_2, i64 20)
+    %clos_as_i64 = ptrtoint ptr %t_2 to i64
+    %app_tmp1 = call i64 @apply1(i64 %clos_as_i64, i64 20)
     store i64 %app_tmp1, ptr %t_3, align 4
     %t_32 = load i64, ptr %t_3, align 4
     store i64 %t_32, ptr %p, align 4
@@ -1486,15 +1790,126 @@
   >   let (head, tail) = result in
   >   let _ = print_gc_status in
   >   print_int head
-  Call parameter type does not match function signature!
-  ptr @make_list
-   i64  %closure_tmp = call i64 @alloc_closure(ptr @make_list, i64 2)
-  Call parameter type does not match function signature!
-    %t_2 = alloca i64, align 8
-   i64  %app_tmp12 = call i64 @apply1(ptr %t_2, i64 %t_311)
-  LLVM ERROR: Broken function found, compilation aborted!
-  Aborted (core dumped)
-  [134]
   $ cat tuple_gc_stress.s
-  cat: tuple_gc_stress.s: No such file or directory
-  [1]
+  ; ModuleID = 'main'
+  source_filename = "main"
+  target triple = "x86_64-pc-linux-gnu"
+  
+  declare void @print_int(i64)
+  
+  declare i64 @alloc_block(i64)
+  
+  declare i64 @alloc_closure(i64, i64)
+  
+  declare i64 @apply1(i64, i64)
+  
+  declare void @print_gc_status()
+  
+  declare void @collect()
+  
+  declare i64 @create_tuple(i64)
+  
+  declare i64 @create_tuple_init(i64, i64)
+  
+  declare i64 @field(i64, i64)
+  
+  define i64 @main() {
+  entry:
+    %main = alloca i64, align 8
+    %t_12 = alloca i64, align 8
+    %t_11 = alloca i64, align 8
+    %tail = alloca i64, align 8
+    %t_13 = alloca i64, align 8
+    %head = alloca i64, align 8
+    %t_14 = alloca i64, align 8
+    %t_10 = alloca i64, align 8
+    %result = alloca i64, align 8
+    %t_9 = alloca i64, align 8
+    %t_8 = alloca i64, align 8
+    %t_7 = alloca i64, align 8
+    %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @print_gc_status to i64), i64 0)
+    store i64 %closure_tmp, ptr %t_7, align 4
+    %closure_tmp1 = call i64 @alloc_closure(i64 ptrtoint (ptr @make_list to i64), i64 2)
+    %app_tmp = call i64 @apply1(i64 %closure_tmp1, i64 10000)
+    store i64 %app_tmp, ptr %t_8, align 4
+    %clos_as_i64 = ptrtoint ptr %t_8 to i64
+    %app_tmp2 = call i64 @apply1(i64 %clos_as_i64, i64 0)
+    store i64 %app_tmp2, ptr %t_9, align 4
+    %t_93 = load i64, ptr %t_9, align 4
+    store i64 %t_93, ptr %result, align 4
+    %result4 = load i64, ptr %result, align 4
+    store i64 %result4, ptr %t_10, align 4
+    %t_105 = load i64, ptr %t_10, align 4
+    %load_tmp = call i64 @field(i64 %t_105, i64 0)
+    store i64 %load_tmp, ptr %t_14, align 4
+    %t_146 = load i64, ptr %t_14, align 4
+    store i64 %t_146, ptr %head, align 4
+    %t_107 = load i64, ptr %t_10, align 4
+    %load_tmp8 = call i64 @field(i64 %t_107, i64 8)
+    store i64 %load_tmp8, ptr %t_13, align 4
+    %t_139 = load i64, ptr %t_13, align 4
+    store i64 %t_139, ptr %tail, align 4
+    %closure_tmp10 = call i64 @alloc_closure(i64 ptrtoint (ptr @print_gc_status to i64), i64 0)
+    store i64 %closure_tmp10, ptr %t_11, align 4
+    %head11 = load i64, ptr %head, align 4
+    call void @print_int(i64 %head11)
+    store i64 0, ptr %t_12, align 4
+    %t_1212 = load i64, ptr %t_12, align 4
+    store i64 %t_1212, ptr %main, align 4
+    ret i64 0
+  }
+  
+  define i64 @make_list(i64 %n, i64 %acc) {
+  entry:
+    %t_5 = alloca i64, align 8
+    %t_4 = alloca i64, align 8
+    %t_3 = alloca i64, align 8
+    %t_2 = alloca i64, align 8
+    %t_1 = alloca i64, align 8
+    %t_0 = alloca i64, align 8
+    %acc2 = alloca i64, align 8
+    %n1 = alloca i64, align 8
+    store i64 %n, ptr %n1, align 4
+    store i64 %acc, ptr %acc2, align 4
+    %n3 = load i64, ptr %n1, align 4
+    %eqtmp = icmp eq i64 %n3, 0
+    store i1 %eqtmp, ptr %t_0, align 1
+    %t_04 = load i64, ptr %t_0, align 4
+    %cond = icmp ne i64 %t_04, 0
+    br i1 %cond, label %then, label %else
+  
+  then:                                             ; preds = %entry
+    %acc5 = load i64, ptr %acc2, align 4
+    br label %ifcont
+  
+  else:                                             ; preds = %entry
+    %n6 = load i64, ptr %n1, align 4
+    %subtmp = sub i64 %n6, 1
+    store i64 %subtmp, ptr %t_1, align 4
+    %t_17 = load i64, ptr %t_1, align 4
+    %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @make_list to i64), i64 2)
+    %app_tmp = call i64 @apply1(i64 %closure_tmp, i64 %t_17)
+    store i64 %app_tmp, ptr %t_2, align 4
+    %n8 = load i64, ptr %n1, align 4
+    %acc9 = load i64, ptr %acc2, align 4
+    %tuple_vals_alloca = alloca i64, i64 2, align 8
+    %ptr_to_elem = getelementptr i64, ptr %tuple_vals_alloca, i64 0
+    store i64 %n8, ptr %ptr_to_elem, align 4
+    %ptr_to_elem10 = getelementptr i64, ptr %tuple_vals_alloca, i64 1
+    store i64 %acc9, ptr %ptr_to_elem10, align 4
+    %alloca_as_i64 = ptrtoint ptr %tuple_vals_alloca to i64
+    %tuple_tmp = call i64 @create_tuple_init(i64 2, i64 %alloca_as_i64)
+    store i64 %tuple_tmp, ptr %t_3, align 4
+    %t_311 = load i64, ptr %t_3, align 4
+    %clos_as_i64 = ptrtoint ptr %t_2 to i64
+    %app_tmp12 = call i64 @apply1(i64 %clos_as_i64, i64 %t_311)
+    store i64 %app_tmp12, ptr %t_4, align 4
+    %t_413 = load i64, ptr %t_4, align 4
+    br label %ifcont
+  
+  ifcont:                                           ; preds = %else, %then
+    %iftmp = phi i64 [ %acc5, %then ], [ %t_413, %else ]
+    store i64 %iftmp, ptr %t_5, align 4
+    %t_514 = load i64, ptr %t_5, align 4
+    ret i64 %t_514
+  }

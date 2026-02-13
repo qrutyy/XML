@@ -130,7 +130,8 @@ let build_alloc_closure fmap func =
   let acval, actyp, _ = FuncMap.find_exn fmap "alloc_closure" in
   let argc = Array.length (Llvm.params func) in
   let argc = Llvm.const_int i64_type argc in
-  Llvm.build_call actyp acval [| func; argc |] "closure_tmp" builder
+  let func_as_i64 = Llvm.build_pointercast func i64_type "func_as_i64" builder in
+  Llvm.build_call actyp acval [| func_as_i64; argc |] "closure_tmp" builder
 ;;
 
 let gen_im_expr_ir fmap = function
@@ -185,7 +186,12 @@ let rec gen_comp_expr_ir fmap = function
          let fclos = build_alloc_closure fmap fval in
          let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
          Array.fold_left
-           (fun clos arg -> build_call_mb_void aptyp apval [| clos; arg |] "app_tmp")
+           (fun clos arg ->
+              let clos_as_i64 =
+                Llvm.build_pointercast clos i64_type "clos_as_i64" builder
+              in
+              (* Llvm.build_call cttyp ctval [| argc; alloca_as_i64 |] "tuple_tmp" builder *)
+              build_call_mb_void aptyp apval [| clos_as_i64; arg |] "app_tmp")
            fclos
            argvs)
      | _ ->
@@ -195,7 +201,11 @@ let rec gen_comp_expr_ir fmap = function
           let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
           let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
           List.fold_left
-            (fun clos arg -> build_call_mb_void aptyp apval [| clos; arg |] "app_tmp")
+            (fun clos arg ->
+               let clos_as_i64 =
+                 Llvm.build_pointercast clos i64_type "clos_as_i64" builder
+               in
+               build_call_mb_void aptyp apval [| clos_as_i64; arg |] "app_tmp")
             v
             argvs
         | _ -> failwith ("Id: " ^ f ^ " not found")))
@@ -337,10 +347,10 @@ let gen_program_ir (program : aprogram) (triple : string) =
   let fmap = prefill_fmap initial_fmap program in
   (* FuncMap.print_fmap fmap; *)
   let _ = List.map (fun item -> gen_astructure_item fmap item) program in
-  Llvm.position_at_end (Llvm.entry_block main_fn) builder;
+  let bbs = Llvm.basic_blocks main_fn in
+  Llvm.position_at_end bbs.(Array.length bbs - 1) builder;
   let _ = Llvm.build_ret (Llvm.const_int i64_type 0) builder in
-  (* match Llvm_analysis.verify_module the_module with
+  match Llvm_analysis.verify_module the_module with
   | Some r -> failwith r
-  | None -> *)
-  Llvm.string_of_llmodule the_module
+  | None -> Llvm.string_of_llmodule the_module
 ;;
