@@ -12,6 +12,7 @@ type options =
   { mutable input_file_name : string option
   ; mutable from_file_name : string option
   ; mutable output_file_name : string option
+  ; mutable optimization_lvl : string option
   ; mutable show_ast : bool
   ; mutable show_anf : bool
   ; mutable show_cc : bool
@@ -22,14 +23,14 @@ type options =
 (*     Compiler Entry Points       *)
 (* ------------------------------- *)
 
-let to_llvm_ir ast =
+let to_llvm_ir ast opt =
   let cc_program = Middleend.Cc.cc_program ast in
   let anf_ast = Middleend.Anf.anf_program cc_program in
   let ll_anf = Middleend.Ll.lambda_lift_program anf_ast in
   (* let buf = Buffer.create 1024 in
   let ppf = formatter_of_buffer buf in *)
   let triple = "x86_64-pc-linux-gnu" in
-  Backend.Codegen_llvm.gen_program_ir ll_anf triple
+  Backend.Codegen_llvm.gen_program_ir ll_anf triple opt
 ;;
 
 (* in *)
@@ -58,7 +59,7 @@ let compile_and_write options source_code =
     (* Middleend.Pprinter.print_anf_program std_formatter anf_after_ll; *)
     printf "%s\n" (Middleend.Anf.show_aprogram anf_after_ll);
     exit 0);
-  let llvm_ir_code = to_llvm_ir ast in
+  let llvm_ir_code = to_llvm_ir ast options.optimization_lvl in
   match options.output_file_name with
   | Some out_file ->
     (try
@@ -108,6 +109,7 @@ let () =
     ; show_anf = false
     ; show_cc = false
     ; show_ll = false
+    ; optimization_lvl = None
     }
   in
   let usage_msg =
@@ -138,6 +140,9 @@ let () =
       (* ( "--gc-stats"
       , Arg.Unit (fun () -> options.gc_stats <- true)
       , "     Enable GC statistics and force a collection at program start/end" ) *)
+    ; ( "-O"
+      , Arg.String (fun opt -> options.optimization_lvl <- Some opt)
+      , "         Set IR optimization level, i.e. \"O2\"" )
     ]
   in
   let handle_anon_arg filename =

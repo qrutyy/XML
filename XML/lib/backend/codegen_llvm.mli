@@ -4,5 +4,6 @@
 
 open Format
 
-(* gens program on LLMV IR from the ast *)
-val gen_program_ir : Middleend.Anf.aprogram -> string -> string
+(** [gen_program_ir prog triple opt] gens program in LLMV IR from the program [prog]
+for the target architecture specified by [triple] with optimization level [opt] if not None, O0 otherwise*)
+val gen_program_ir : Middleend.Anf.aprogram -> string -> string option -> string

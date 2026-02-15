@@ -8,6 +8,7 @@
   llvm
   llvm.analysis
   llvm.executionengine
+  llvm.passbuilder
   stdio
   XML.Common
   XML.Middleend)

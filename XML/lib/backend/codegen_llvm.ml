@@ -339,7 +339,23 @@ let gen_astructure_item fmap = function
     Llvm.build_store value alloca builder
 ;;
 
-let gen_program_ir (program : aprogram) (triple : string) =
+let optimize_ir (triple : string) (opt : string option) =
+  let target = Llvm_target.Target.by_triple triple in
+  let machine = Llvm_target.TargetMachine.create ~triple target in
+  let opts = Llvm_passbuilder.create_passbuilder_options () in
+  let optflag =
+    match opt with
+    | Some opt -> opt
+    | _ -> "O0"
+  in
+  let optflag = "default<" ^ optflag ^ ">" in
+  (match Llvm_passbuilder.run_passes the_module optflag machine opts with
+   | Error e -> failwith e
+   | Ok () -> ());
+  Llvm_passbuilder.dispose_passbuilder_options opts
+;;
+
+let gen_program_ir (program : aprogram) (triple : string) (opt : string option) =
   Llvm.set_target_triple triple the_module;
   assert (Llvm_executionengine.initialize ());
   let main_ty = Llvm.function_type i64_type [||] in
@@ -350,6 +366,7 @@ let gen_program_ir (program : aprogram) (triple : string) =
   let bbs = Llvm.basic_blocks main_fn in
   Llvm.position_at_end bbs.(Array.length bbs - 1) builder;
   let _ = Llvm.build_ret (Llvm.const_int i64_type 0) builder in
+  optimize_ir triple opt;
   match Llvm_analysis.verify_module the_module with
   | Some r -> failwith r
   | None -> Llvm.string_of_llmodule the_module
