@@ -7,7 +7,7 @@ open Common.Ast
 
 let context = Llvm.global_context ()
 let i64_type = Llvm.i64_type context
-let i32_type = Llvm.i32_type context
+let gl_align = 8
 let void_type = Llvm.void_type context
 let gcheader_type = Llvm.struct_type context [| i64_type |]
 let block_elms_type = Llvm.array_type i64_type 0
@@ -136,7 +136,10 @@ let gen_im_expr_ir fmap = function
   | Imm_num n -> Llvm.const_int i64_type ((n lsl 1) lor 1)
   | Imm_ident id ->
     (match Hashtbl.find_opt named_values id with
-     | Some v -> Llvm.build_load default_type v id builder
+     | Some v ->
+       let temp = Llvm.build_load default_type v id builder in
+       Llvm.set_alignment gl_align temp;
+       temp
      | None ->
        (match FuncMap.find fmap id with
         | Some (fval, _, _) ->
@@ -175,12 +178,26 @@ let gen_tagged_binop fmap op lhs rhs =
     let temp = Llvm.build_sdiv left' right' "divtmp3" builder in
     let temp1 = Llvm.build_add temp temp "divtmp4" builder in
     Llvm.build_add temp1 one "divtmp5" builder
-  | "<" -> Llvm.build_icmp Llvm.Icmp.Slt left right "slttmp" builder
-  | "<=" -> Llvm.build_icmp Llvm.Icmp.Sle left right "sletmp" builder
-  | ">" -> Llvm.build_icmp Llvm.Icmp.Sgt left right "sgttmp" builder
-  | ">=" -> Llvm.build_icmp Llvm.Icmp.Sge left right "sgetmp" builder
-  | "=" -> Llvm.build_icmp Llvm.Icmp.Eq left right "eqtmp" builder
-  | "<>" -> Llvm.build_icmp Llvm.Icmp.Ne left right "neqtmp" builder
+  | "<" ->
+    (* if we don't extend, Llvm will generate store i1 instead of store i64
+      and this will lead to strange behaviour *)
+    let temp = Llvm.build_icmp Llvm.Icmp.Slt left right "slttmp" builder in
+    Llvm.build_zext temp i64_type "slttmp_as_i64" builder
+  | "<=" ->
+    let temp = Llvm.build_icmp Llvm.Icmp.Sle left right "sletmp" builder in
+    Llvm.build_zext temp i64_type "sletmp_as_i64" builder
+  | ">" ->
+    let temp = Llvm.build_icmp Llvm.Icmp.Sgt left right "sgttmp" builder in
+    Llvm.build_zext temp i64_type "sgttmp_as_i64" builder
+  | ">=" ->
+    let temp = Llvm.build_icmp Llvm.Icmp.Sge left right "sgetmp" builder in
+    Llvm.build_zext temp i64_type "sgetmp_as_i64" builder
+  | "=" ->
+    let temp = Llvm.build_icmp Llvm.Icmp.Eq left right "eqtmp" builder in
+    Llvm.build_zext temp i64_type "eqtmp_as_i64" builder
+  | "<>" ->
+    let temp = Llvm.build_icmp Llvm.Icmp.Ne left right "neqtmp" builder in
+    Llvm.build_zext temp i64_type "neqtmp_as_i64" builder
   | _ -> invalid_arg ("Unsupported binary operator: " ^ op)
 ;;
 
@@ -268,7 +285,8 @@ let rec gen_comp_expr_ir fmap = function
              "ptr_to_elem"
              builder
          in
-         let _ = Llvm.build_store elem ptr_to_elem builder in
+         let store = Llvm.build_store elem ptr_to_elem builder in
+         Llvm.set_alignment gl_align store;
          ())
       argv;
     let alloca_as_i64 = Llvm.build_pointercast alloca i64_type "alloca_as_i64" builder in
@@ -287,7 +305,8 @@ and gen_anf_expr fmap = function
     let init_val = gen_comp_expr_ir fmap comp_expr in
     let the_fun = Llvm.block_parent (Llvm.insertion_block builder) in
     let alloca = create_entry_alloca the_fun name in
-    let _ = Llvm.build_store init_val alloca builder in
+    let store = Llvm.build_store init_val alloca builder in
+    Llvm.set_alignment gl_align store;
     Hashtbl.add named_values name alloca;
     gen_anf_expr fmap body
 ;;
@@ -321,7 +340,8 @@ let gen_function fmap name params body =
     (fun i ai ->
        let name = List.nth params i in
        let alloca = create_entry_alloca the_fun name in
-       let _ = Llvm.build_store ai alloca builder in
+       let store = Llvm.build_store ai alloca builder in
+       Llvm.set_alignment gl_align store;
        Hashtbl.replace named_values name alloca)
     (Llvm.params the_fun);
   (* Need to check for error here *)
@@ -351,7 +371,9 @@ let gen_astructure_item fmap = function
     let value = gen_anf_expr fmap expr in
     let alloca = create_entry_alloca main_fn name in
     Hashtbl.add named_values name alloca;
-    Llvm.build_store value alloca builder
+    let store = Llvm.build_store value alloca builder in
+    Llvm.set_alignment gl_align store;
+    store
 ;;
 
 let optimize_ir (triple : string) (opt : string option) =
