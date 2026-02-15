@@ -356,6 +356,7 @@ let optimize_ir (triple : string) (opt : string option) =
 ;;
 
 let gen_program_ir (program : aprogram) (triple : string) (opt : string option) =
+  Llvm_all_backends.initialize ();
   Llvm.set_target_triple triple the_module;
   assert (Llvm_executionengine.initialize ());
   let main_ty = Llvm.function_type i64_type [||] in

@@ -9,6 +9,7 @@
   llvm.analysis
   llvm.executionengine
   llvm.passbuilder
+  llvm.all_backends
   stdio
   XML.Common
   XML.Middleend)

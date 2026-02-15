@@ -13,6 +13,7 @@ type options =
   ; mutable from_file_name : string option
   ; mutable output_file_name : string option
   ; mutable optimization_lvl : string option
+  ; mutable target : string
   ; mutable show_ast : bool
   ; mutable show_anf : bool
   ; mutable show_cc : bool
@@ -23,14 +24,16 @@ type options =
 (*     Compiler Entry Points       *)
 (* ------------------------------- *)
 
-let to_llvm_ir ast opt =
+let to_llvm_ir ast options =
   let cc_program = Middleend.Cc.cc_program ast in
   let anf_ast = Middleend.Anf.anf_program cc_program in
   let ll_anf = Middleend.Ll.lambda_lift_program anf_ast in
   (* let buf = Buffer.create 1024 in
   let ppf = formatter_of_buffer buf in *)
-  let triple = "x86_64-pc-linux-gnu" in
-  Backend.Codegen_llvm.gen_program_ir ll_anf triple opt
+  (* let triple = "x86_64-pc-linux-gnu" in *)
+  let target = options.target in
+  let opt = options.optimization_lvl in
+  Backend.Codegen_llvm.gen_program_ir ll_anf target opt
 ;;
 
 (* in *)
@@ -59,7 +62,7 @@ let compile_and_write options source_code =
     (* Middleend.Pprinter.print_anf_program std_formatter anf_after_ll; *)
     printf "%s\n" (Middleend.Anf.show_aprogram anf_after_ll);
     exit 0);
-  let llvm_ir_code = to_llvm_ir ast options.optimization_lvl in
+  let llvm_ir_code = to_llvm_ir ast options in
   match options.output_file_name with
   | Some out_file ->
     (try
@@ -110,6 +113,7 @@ let () =
     ; show_cc = false
     ; show_ll = false
     ; optimization_lvl = None
+    ; target = "riscv64-unknown-linux-gnu"
     }
   in
   let usage_msg =
@@ -142,7 +146,10 @@ let () =
       , "     Enable GC statistics and force a collection at program start/end" ) *)
     ; ( "-O"
       , Arg.String (fun opt -> options.optimization_lvl <- Some opt)
-      , "         Set IR optimization level, i.e. \"O2\"" )
+      , "         Set IR optimization level, \"O0\" by default" )
+    ; ( "-t"
+      , Arg.String (fun targ -> options.target <- targ)
+      , "         Set target platform, \"riscv64-unknown-linux-gnu\" by default" )
     ]
   in
   let handle_anon_arg filename =

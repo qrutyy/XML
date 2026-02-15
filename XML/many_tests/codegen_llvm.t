@@ -1,12 +1,12 @@
-  $ dune exec ./../bin/XML_llvm.exe -- -o factorial.s <<EOF
+  $ dune exec ./../bin/XML_llvm.exe -- -o factorial.ll <<EOF
   > let rec fac n = if n = 0 then 1 else n * fac (n - 1)
   > 
   > let main = print_int (fac 4)
 
-  $ cat factorial.s
+  $ cat factorial.ll
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -90,7 +90,7 @@
   $ cat fibonacci.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -187,7 +187,7 @@
   $ cat ififif.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -324,7 +324,7 @@
   $ cat closure.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -388,7 +388,7 @@
   $ cat 010faccps_ll.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -522,7 +522,7 @@
   $ cat 010fibcps_ll.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -702,7 +702,7 @@
   $ cat 004manyargs.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -939,7 +939,7 @@
   $ cat tuple_return.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -1039,7 +1039,7 @@
   $ cat tuple_swap.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -1155,7 +1155,7 @@
   $ cat tuple_order.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -1250,7 +1250,7 @@
   $ cat tuple_linked_list.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -1380,7 +1380,7 @@
   $ cat tuple_large.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -1522,7 +1522,7 @@
   $ cat tuple_basic.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -1597,7 +1597,7 @@
   $ cat tuple_nested.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -1701,7 +1701,7 @@
   $ cat tuple_arg.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
@@ -1793,7 +1793,7 @@
   $ cat tuple_gc_stress.s
   ; ModuleID = 'main'
   source_filename = "main"
-  target triple = "x86_64-pc-linux-gnu"
+  target triple = "riscv64-unknown-linux-gnu"
   
   declare void @print_int(i64)
   
