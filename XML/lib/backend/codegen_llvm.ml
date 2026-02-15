@@ -5,8 +5,6 @@
 open Middleend.Anf
 open Common.Ast
 
-(* Don't forget about tagging ints *)
-
 let context = Llvm.global_context ()
 let i64_type = Llvm.i64_type context
 let i32_type = Llvm.i32_type context
@@ -135,7 +133,7 @@ let build_alloc_closure fmap func =
 ;;
 
 let gen_im_expr_ir fmap = function
-  | Imm_num n -> Llvm.const_int i64_type n
+  | Imm_num n -> Llvm.const_int i64_type ((n lsl 1) lor 1)
   | Imm_ident id ->
     (match Hashtbl.find_opt named_values id with
      | Some v -> Llvm.build_load default_type v id builder
@@ -152,26 +150,43 @@ let create_entry_alloca the_fun var_name =
   Llvm.build_alloca i64_type var_name builder
 ;;
 
+(* working with tagged integers *)
+let gen_tagged_binop fmap op lhs rhs =
+  let left = gen_im_expr_ir fmap lhs in
+  let right = gen_im_expr_ir fmap rhs in
+  let one = Llvm.const_int i64_type 1 in
+  (* let build_oper, name = *)
+  match op with
+  | "+" ->
+    (* Llvm.build_add, "addtmp" *)
+    let temp = Llvm.build_add left right "addtmp1" builder in
+    Llvm.build_sub temp one "addtmp2" builder
+  | "-" ->
+    let temp = Llvm.build_sub left right "subtmp1" builder in
+    Llvm.build_add temp one "subtmp2" builder
+  | "*" ->
+    let left' = Llvm.build_lshr left one "multmp1" builder in
+    let right' = Llvm.build_sub right one "multmp2" builder in
+    let temp = Llvm.build_mul left' right' "multmp3" builder in
+    Llvm.build_add temp one "multmp4" builder
+  | "/" ->
+    let left' = Llvm.build_lshr left one "divtmp1" builder in
+    let right' = Llvm.build_lshr right one "divtmp2" builder in
+    let temp = Llvm.build_sdiv left' right' "divtmp3" builder in
+    let temp1 = Llvm.build_add temp temp "divtmp4" builder in
+    Llvm.build_add temp1 one "divtmp5" builder
+  | "<" -> Llvm.build_icmp Llvm.Icmp.Slt left right "slttmp" builder
+  | "<=" -> Llvm.build_icmp Llvm.Icmp.Sle left right "sletmp" builder
+  | ">" -> Llvm.build_icmp Llvm.Icmp.Sgt left right "sgttmp" builder
+  | ">=" -> Llvm.build_icmp Llvm.Icmp.Sge left right "sgetmp" builder
+  | "=" -> Llvm.build_icmp Llvm.Icmp.Eq left right "eqtmp" builder
+  | "<>" -> Llvm.build_icmp Llvm.Icmp.Ne left right "neqtmp" builder
+  | _ -> invalid_arg ("Unsupported binary operator: " ^ op)
+;;
+
 let rec gen_comp_expr_ir fmap = function
   | Comp_imm imm -> gen_im_expr_ir fmap imm
-  | Comp_binop (op, lhs, rhs) ->
-    let lhs_val = gen_im_expr_ir fmap lhs in
-    let rhs_val = gen_im_expr_ir fmap rhs in
-    let build_oper, name =
-      match op with
-      | "+" -> Llvm.build_add, "addtmp"
-      | "-" -> Llvm.build_sub, "subtmp"
-      | "*" -> Llvm.build_mul, "multmp"
-      | "/" -> Llvm.build_sdiv, "divtmp"
-      | "<" -> Llvm.build_icmp Llvm.Icmp.Slt, "slttmp"
-      | "<=" -> Llvm.build_icmp Llvm.Icmp.Sle, "sletmp"
-      | ">" -> Llvm.build_icmp Llvm.Icmp.Sgt, "sgttmp"
-      | ">=" -> Llvm.build_icmp Llvm.Icmp.Sge, "sgetmp"
-      | "=" -> Llvm.build_icmp Llvm.Icmp.Eq, "eqtmp"
-      | "<>" -> Llvm.build_icmp Llvm.Icmp.Ne, "neqtmp"
-      | _ -> invalid_arg ("Unsupported binary operator: " ^ op)
-    in
-    build_oper lhs_val rhs_val name builder
+  | Comp_binop (op, lhs, rhs) -> gen_tagged_binop fmap op lhs rhs
   | Comp_app (Imm_ident f, args) ->
     (* Format.printf "Id: %s got called with %d args\n" f (List.length args); *)
     (match FuncMap.find fmap f with
