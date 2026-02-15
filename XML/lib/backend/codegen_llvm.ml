@@ -264,7 +264,7 @@ let rec gen_comp_expr_ir fmap = function
     let voffst = Llvm.const_int i64_type offset in
     let fifn, fity, _ = FuncMap.find_exn fmap "field" in
     Llvm.build_call fity fifn [| vbase; voffst |] "load_tmp" builder
-  | Comp_func (_, _) -> failwith "func are not implemented yet"
+  | Comp_func (_, _) -> failwith "anonymous functions should be lambda-lifted"
 
 and gen_anf_expr fmap = function
   | Anf_comp_expr comp -> gen_comp_expr_ir fmap comp
