@@ -96,7 +96,6 @@
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu -cpu rv64 ./prog.exe
   7
 
-
   $ dune exec ./../bin/XML.exe -- -o gc_oom_block.s <<EOF
   > let main =
   >   let _ = alloc_block 10000000 in
