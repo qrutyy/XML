@@ -251,8 +251,8 @@ let rec gen_comp_expr_ir fmap = function
           Llvm.set_alignment gl_align clos_val;
           let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
           build_apply_part fmap clos_val argvs
-        | _ -> failwith ("Id: " ^ f ^ " not found")))
-  | Comp_app (Imm_num _, _) -> failwith "cannot apply number as a function"
+        | _ -> invalid_arg ("Id: " ^ f ^ " not found")))
+  | Comp_app (Imm_num _, _) -> invalid_arg "cannot apply number as a function"
   | Comp_branch (cond, br_then, br_else) ->
     let cv = gen_im_expr_ir fmap cond in
     let zero = Llvm.const_int i64_type 0 in
@@ -308,7 +308,7 @@ let rec gen_comp_expr_ir fmap = function
     let voffst = Llvm.const_int i64_type (offset / Target.word_size) in
     let fifn, fity, _ = FuncMap.find_exn fmap "field" in
     Llvm.build_call fity fifn [| vbase; voffst |] "load_tmp" builder
-  | Comp_func (_, _) -> failwith "anonymous functions should be lambda-lifted"
+  | Comp_func (_, _) -> invalid_arg "anonymous functions should be lambda-lifted"
 
 and gen_anf_expr fmap = function
   | Anf_comp_expr comp -> gen_comp_expr_ir fmap comp
@@ -358,13 +358,13 @@ let gen_function fmap name params body =
   (* Need to check for error here *)
   let ret_val = gen_anf_expr fmap body in
   let _ = Llvm.build_ret ret_val builder in
-  (match Llvm_analysis.verify_function the_fun with
-   | true -> ()
-   | false ->
-     Stdlib.Format.printf
-       "invalid function generated\n%s\n"
-       (Llvm.string_of_llvalue the_fun);
-     Llvm_analysis.assert_valid_function the_fun);
+  if Llvm_analysis.verify_function the_fun
+  then ()
+  else (
+    Stdlib.Format.printf
+      "invalid function generated\n%s\n"
+      (Llvm.string_of_llvalue the_fun);
+    Llvm_analysis.assert_valid_function the_fun);
   the_fun
 ;;
 
@@ -376,7 +376,7 @@ let gen_astructure_item fmap = function
     let main_fn =
       match Llvm.lookup_function "main" the_module with
       | Some fn -> fn
-      | _ -> failwith ("cannot generate value: " ^ name ^ ", main function not found")
+      | _ -> invalid_arg ("cannot generate value: " ^ name ^ ", main function not found")
     in
     Llvm.position_at_end (Llvm.entry_block main_fn) builder;
     let value = gen_anf_expr fmap expr in
@@ -398,7 +398,7 @@ let optimize_ir (triple : string) (opt : string option) =
   in
   let optflag = "default<" ^ optflag ^ ">" in
   (match Llvm_passbuilder.run_passes the_module optflag machine opts with
-   | Error e -> failwith e
+   | Error e -> invalid_arg e
    | Ok () -> ());
   Llvm_passbuilder.dispose_passbuilder_options opts
 ;;
@@ -424,6 +424,6 @@ let gen_program_ir (program : aprogram) (triple : string) (opt : string option) 
   let _ = Llvm.build_ret (Llvm.const_int i64_type 0) builder in
   optimize_ir triple opt;
   match Llvm_analysis.verify_module the_module with
-  | Some r -> failwith r
+  | Some r -> invalid_arg r
   | None -> Llvm.string_of_llmodule the_module
 ;;

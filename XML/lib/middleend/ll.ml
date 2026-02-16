@@ -43,7 +43,7 @@ let occurs_im x = function
 ;;
 
 let rec escapes_comp x = function
-  | Comp_func (ps, body) -> if List.mem x ps then false else SSet.mem x (fv_anf body)
+  | Comp_func (ps, body) -> (not (List.mem x ps)) && SSet.mem x (fv_anf body)
   | Comp_branch (_c, t, e) -> escapes_anf x t || escapes_anf x e
   | Comp_app (_, _)
   | Comp_binop (_, _, _)
