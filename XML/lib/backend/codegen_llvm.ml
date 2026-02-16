@@ -4,10 +4,11 @@
 
 open Middleend.Anf
 open Common.Ast
+open Target
 
 let context = Llvm.global_context ()
 let i64_type = Llvm.i64_type context
-let gl_align = 8
+let gl_align = Target.word_size
 let void_type = Llvm.void_type context
 let gcheader_type = Llvm.struct_type context [| i64_type |]
 let block_elms_type = Llvm.array_type i64_type 0
@@ -89,6 +90,7 @@ let initial_fmap =
     decl fmap "create_tuple_init" i64_type (*ptr*) [| i64_type; i64_type (*ptr*) |]
   in
   let fmap = decl fmap "field" i64_type (*ptr or int*) [| i64_type (*ptr*); i64_type |] in
+  let fmap = decl fmap "rt_init" void_type [| i64_type |] in
   fmap
 ;;
 
@@ -124,11 +126,20 @@ let prefill_fmap (fmap0 : FuncMap.t) (program : aprogram) : FuncMap.t =
     program
 ;;
 
+(* for debug *)
+let _print_untag fmap n =
+  let pival, pityp, _ = FuncMap.find_exn fmap "print_int" in
+  let _ = build_call_mb_void pityp pival [| n |] "_" in
+  ()
+;;
+
 let build_alloc_closure fmap func =
   let acval, actyp, _ = FuncMap.find_exn fmap "alloc_closure" in
   let argc = Array.length (Llvm.params func) in
   let argc = Llvm.const_int i64_type argc in
   let func_as_i64 = Llvm.build_pointercast func i64_type "func_as_i64" builder in
+  (* _print_untag fmap func_as_i64;
+  _print_untag fmap argc; *)
   Llvm.build_call actyp acval [| func_as_i64; argc |] "closure_tmp" builder
 ;;
 
@@ -142,9 +153,12 @@ let gen_im_expr_ir fmap = function
        temp
      | None ->
        (match FuncMap.find fmap id with
-        | Some (fval, _, _) ->
-          (* return a pointer to a closure *)
-          build_alloc_closure fmap fval
+        | Some (fval, ftyp, _) ->
+          if Array.length (Llvm.params fval) = 0
+          then build_call_mb_void ftyp fval [||] "calltmp"
+          else
+            (* return a pointer to a closure *)
+            build_alloc_closure fmap fval
         | None -> invalid_arg ("Name not bound: " ^ id)))
 ;;
 
@@ -201,6 +215,18 @@ let gen_tagged_binop fmap op lhs rhs =
   | _ -> invalid_arg ("Unsupported binary operator: " ^ op)
 ;;
 
+let build_apply_part fmap fclos args =
+  let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
+  List.fold_left
+    (fun clos arg ->
+       let clos_as_i64 = Llvm.build_pointercast clos i64_type "clos_as_i64" builder in
+       (* _print_untag fmap clos_as_i64;
+       _print_untag fmap arg; *)
+       build_call_mb_void aptyp apval [| clos_as_i64; arg |] "apptmp")
+    fclos
+    args
+;;
+
 let rec gen_comp_expr_ir fmap = function
   | Comp_imm imm -> gen_im_expr_ir fmap imm
   | Comp_binop (op, lhs, rhs) -> gen_tagged_binop fmap op lhs rhs
@@ -209,37 +235,22 @@ let rec gen_comp_expr_ir fmap = function
     (match FuncMap.find fmap f with
      | Some (fval, ftype, _) ->
        let pvs = Llvm.params fval in
-       let argvs = Array.map (fun arg -> gen_im_expr_ir fmap arg) (Array.of_list args) in
+       let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
        if List.length args = Array.length pvs
        then
-         build_call_mb_void ftype fval argvs "calltmp"
-         (* then Llvm.build_call ftype fval argvs "calltmp" builder *)
+         build_call_mb_void ftype fval (Array.of_list argvs) "calltmp"
+         (* build_apply fmap fval argvs *)
        else (
          let fclos = build_alloc_closure fmap fval in
-         let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
-         Array.fold_left
-           (fun clos arg ->
-              let clos_as_i64 =
-                Llvm.build_pointercast clos i64_type "clos_as_i64" builder
-              in
-              (* Llvm.build_call cttyp ctval [| argc; alloca_as_i64 |] "tuple_tmp" builder *)
-              build_call_mb_void aptyp apval [| clos_as_i64; arg |] "app_tmp")
-           fclos
-           argvs)
+         build_apply_part fmap fclos argvs)
      | _ ->
        (* maybe it's a closure in this scope *)
        (match Hashtbl.find_opt named_values f with
-        | Some v ->
+        | Some clos_ptr ->
+          let clos_val = Llvm.build_load default_type clos_ptr (f ^ "_val") builder in
+          Llvm.set_alignment gl_align clos_val;
           let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
-          let apval, aptyp, _ = FuncMap.find_exn fmap "apply1" in
-          List.fold_left
-            (fun clos arg ->
-               let clos_as_i64 =
-                 Llvm.build_pointercast clos i64_type "clos_as_i64" builder
-               in
-               build_call_mb_void aptyp apval [| clos_as_i64; arg |] "app_tmp")
-            v
-            argvs
+          build_apply_part fmap clos_val argvs
         | _ -> failwith ("Id: " ^ f ^ " not found")))
   | Comp_app (Imm_num _, _) -> failwith "cannot apply number as a function"
   | Comp_branch (cond, br_then, br_else) ->
@@ -294,7 +305,7 @@ let rec gen_comp_expr_ir fmap = function
   | Comp_load (imexpr, offset) ->
     (*addr of the tuple *)
     let vbase = gen_im_expr_ir fmap imexpr in
-    let voffst = Llvm.const_int i64_type offset in
+    let voffst = Llvm.const_int i64_type (offset / Target.word_size) in
     let fifn, fity, _ = FuncMap.find_exn fmap "field" in
     Llvm.build_call fity fifn [| vbase; voffst |] "load_tmp" builder
   | Comp_func (_, _) -> failwith "anonymous functions should be lambda-lifted"
@@ -396,13 +407,20 @@ let gen_program_ir (program : aprogram) (triple : string) (opt : string option) 
   Llvm_all_backends.initialize ();
   Llvm.set_target_triple triple the_module;
   assert (Llvm_executionengine.initialize ());
-  let main_ty = Llvm.function_type i64_type [||] in
-  let main_fn = Llvm.define_function "main" main_ty the_module in
   let fmap = prefill_fmap initial_fmap program in
   (* FuncMap.print_fmap fmap; *)
+  let main_ty = Llvm.function_type i64_type [||] in
+  let main_fn = Llvm.define_function "main" main_ty the_module in
+  Llvm.position_at_end (Llvm.entry_block main_fn) builder;
+  let initfn, initty, _ = FuncMap.find_exn fmap "rt_init" in
+  let _ =
+    build_call_mb_void initty initfn [| Llvm.const_int i64_type (5 * 1024) |] "inittmp"
+  in
   let _ = List.map (fun item -> gen_astructure_item fmap item) program in
   let bbs = Llvm.basic_blocks main_fn in
   Llvm.position_at_end bbs.(Array.length bbs - 1) builder;
+  let col_fn, col_ty, _ = FuncMap.find_exn fmap "collect" in
+  let _ = build_call_mb_void col_ty col_fn [||] "_" in
   let _ = Llvm.build_ret (Llvm.const_int i64_type 0) builder in
   optimize_ir triple opt;
   match Llvm_analysis.verify_module the_module with
