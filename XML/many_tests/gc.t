@@ -105,7 +105,7 @@
   $ riscv64-linux-gnu-gcc -c ../bin/runtime.c -o runtime.o
   $ riscv64-linux-gnu-gcc temp.o runtime.o -o prog.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu -cpu rv64 ./prog.exe || true
-  GC: out of memory: asked for 160000024 bytes, alloc_ptr is 0x2aaaab4e8010 (end is 0x2aaaab568010)
+  GC: out of memory: asked for 160000024 bytes)
   Aborted (core dumped)
 
 

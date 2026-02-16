@@ -110,7 +110,7 @@
   $ llc-18 gc_oom_block.ll -o gc_oom_block.s
   $ clang-18  --target=riscv64-linux-gnu -static gc_oom_block.s runtime.o -o gc_oom_block.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./gc_oom_block.exe
-  GC: out of memory: asked for 160000024 bytes, alloc_ptr is 0x2aaaab32d010 (end is 0x2aaaab3ad010)
+  GC: out of memory: asked for 160000024 bytes)
   Aborted (core dumped)
   [134]
 

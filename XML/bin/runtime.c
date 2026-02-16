@@ -208,8 +208,7 @@ static void* gc_alloc_bytes(size_t n, GCType* vt) {
     if (alloc_ptr + n > from_end) {
         gc_collect();
         char msg[100];
-        sprintf(msg, "GC: out of memory: asked for %ld bytes, alloc_ptr is %p (end is %p)", n,
-                alloc_ptr, from_end);
+        sprintf(msg, "GC: out of memory: asked for %ld bytes)", n);
         if (alloc_ptr + n > from_end) panic(msg);
     }
     uint8_t* p = alloc_ptr;
