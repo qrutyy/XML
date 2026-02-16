@@ -1,4 +1,4 @@
-(** Copyright 2024-2025, Mikhail Gavrilenko,Danila Rudnev-Stepanyan, Daniel Vlasenko *)
+(** Copyright 2025-2026, Mikhail Gavrilenko,Danila Rudnev-Stepanyan, Daniel Vlasenko *)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 

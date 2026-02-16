@@ -42,10 +42,9 @@ let gen_ident =
     map2
       (fun start_sym rest_sym -> Base.Char.to_string start_sym ^ rest_sym)
       (oneof [ char_range 'A' 'Z'; char_range 'a' 'z'; return '_' ])
-      (small_string
-         ~gen:
-           (oneof
-              [ char_range 'A' 'Z'; char_range 'a' 'z'; char_range '0' '9'; return '_' ]))
+      (string_small_of
+         (oneof
+            [ char_range 'A' 'Z'; char_range 'a' 'z'; char_range '0' '9'; return '_' ]))
   in
   gen_filtered_ident base_gen
 ;;
@@ -55,10 +54,9 @@ let gen_ident_uc =
     map2
       (fun start_sym rest_sym -> Base.Char.to_string start_sym ^ rest_sym)
       (char_range 'A' 'Z')
-      (small_string
-         ~gen:
-           (oneof
-              [ char_range 'A' 'Z'; char_range 'a' 'z'; char_range '0' '9'; return '_' ]))
+      (string_small_of
+         (oneof
+            [ char_range 'A' 'Z'; char_range 'a' 'z'; char_range '0' '9'; return '_' ]))
   in
   gen_filtered_ident base_gen
 ;;
@@ -71,10 +69,9 @@ let gen_ident_lc include_us =
     map2
       (fun start_sym rest_sym -> Base.Char.to_string start_sym ^ rest_sym)
       start_sym
-      (small_string
-         ~gen:
-           (oneof
-              [ char_range 'A' 'Z'; char_range 'a' 'z'; char_range '0' '9'; return '_' ]))
+      (string_small_of
+         (oneof
+            [ char_range 'A' 'Z'; char_range 'a' 'z'; char_range '0' '9'; return '_' ]))
   in
   gen_filtered_ident base_gen
 ;;
@@ -91,10 +88,9 @@ end
 
 module Constant = struct
   type t =
-    | Const_integer of (int[@gen small_nat]) (** integer as [52] *)
+    | Const_integer of (int[@gen nat_small]) (** integer as [52] *)
     | Const_char of (char[@gen gen_charc]) (** char as ['w'] *)
-    | Const_string of (string[@gen small_string ~gen:gen_charc])
-    (** string as ["Kakadu"] *)
+    | Const_string of (string[@gen string_small_of gen_charc]) (** string as ["Kakadu"] *)
   [@@deriving eq, show { with_path = false }, qcheck]
 end
 
@@ -215,7 +211,7 @@ module Structure = struct
   [@@deriving eq, show { with_path = false }]
 
   let gen_structure_item n =
-    frequency
+    oneof_weighted
       [ 0, map (fun expr -> Str_eval expr) (Expression.gen_sized (n / 2))
       ; ( 0
         , let* rec_flag =
@@ -223,15 +219,15 @@ module Structure = struct
           in
           let* bind1 = Expression.gen_value_binding Expression.gen_sized (n / 2) in
           let* bindl =
-            small_list (Expression.gen_value_binding Expression.gen_sized (n / 2))
+            list_small (Expression.gen_value_binding Expression.gen_sized (n / 2))
           in
           return (Str_value (rec_flag, (bind1, bindl))) )
       ; ( 1
-        , let* tparam = small_list (gen_ident_lc true) in
+        , let* tparam = list_small (gen_ident_lc true) in
           let* idt = gen_ident_lc true in
           let* cons1 = Gen.pair gen_ident_uc (Gen.option (TypeExpr.gen_sized (n / 20))) in
           let* consl =
-            small_list (Gen.pair gen_ident_uc (Gen.option (TypeExpr.gen_sized (n / 20))))
+            list_small (Gen.pair gen_ident_uc (Gen.option (TypeExpr.gen_sized (n / 20))))
           in
           return (Str_adt (tparam, idt, (cons1, consl))) )
       ]
