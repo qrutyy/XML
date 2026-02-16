@@ -1,4 +1,4 @@
-  $ clang --target=riscv64-linux-gnu --sysroot=/usr/riscv64-unknown-linux-gnu -c ./../bin/runtime.c -o runtime.o
+  $ clang-18 --target=riscv64-linux-gnu --sysroot=/usr/riscv64-unknown-linux-gnu -c ./../bin/runtime.c -o runtime.o
 
 ====================== O0 ======================
 
@@ -144,8 +144,8 @@
     ret i64 0
   }
 
-  $ llc temp.ll -o temp.s
-  $ clang  --target=riscv64-linux-gnu -static temp.s runtime.o -o temp.exe
+  $ llc-18 temp.ll -o temp.s
+  $ clang-18  --target=riscv64-linux-gnu -static temp.s runtime.o -o temp.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./temp.exe
   24
 
@@ -222,8 +222,8 @@
   
   attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) }
 
-  $ llc temp.ll -o temp.s
-  $ clang  --target=riscv64-linux-gnu -static temp.s runtime.o -o temp.exe
+  $ llc-18 temp.ll -o temp.s
+  $ clang-18  --target=riscv64-linux-gnu -static temp.s runtime.o -o temp.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./temp.exe
   24
 
@@ -300,8 +300,8 @@
   
   attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) }
 
-  $ llc temp.ll -o temp.s
-  $ clang  --target=riscv64-linux-gnu -static temp.s runtime.o -o temp.exe
+  $ llc-18 temp.ll -o temp.s
+  $ clang-18  --target=riscv64-linux-gnu -static temp.s runtime.o -o temp.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./temp.exe
   24
 
@@ -378,15 +378,15 @@
   
   attributes #0 = { mustprogress nofree norecurse nosync nounwind willreturn memory(none) }
 
-  $ llc temp.ll -o temp.s
-  $ clang  --target=riscv64-linux-gnu -static temp.s runtime.o -o temp.exe
+  $ llc-18 temp.ll -o temp.s
+  $ clang-18  --target=riscv64-linux-gnu -static temp.s runtime.o -o temp.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./temp.exe
   24
 
 ====================== RISC-V ======================
 
   $ dune exec -- ../bin/XML_llvm.exe -fromfile manytests/typed/010faccps_ll.ml -o temp.ll -t "riscv64-unknown-linux-gnu"
-  $ llc temp.ll -o temp.s
+  $ llc-18 temp.ll -o temp.s
   $ cat temp.s
   	.text
   	.attribute	4, 16
@@ -556,7 +556,7 @@
 ====================== x86-64 ======================
 
   $ dune exec -- ../bin/XML_llvm.exe -fromfile manytests/typed/010faccps_ll.ml -o temp.ll -t "x86_64-pc-linux-gnu" 
-  $ llc temp.ll -o temp.s
+  $ llc-18 temp.ll -o temp.s
   $ cat temp.s
   	.text
   	.file	"main"

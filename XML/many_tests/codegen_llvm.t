@@ -1,4 +1,4 @@
-  $ clang --target=riscv64-linux-gnu --sysroot=/usr/riscv64-unknown-linux-gnu -c ./../bin/runtime.c -o runtime.o
+  $ clang-18 --target=riscv64-linux-gnu --sysroot=/usr/riscv64-unknown-linux-gnu -c ./../bin/runtime.c -o runtime.o
 
 ====================== Factorial ======================
 
@@ -94,8 +94,8 @@
     ret i64 0
   }
 
-  $ llc factorial.ll -o factorial.s
-  $ clang  --target=riscv64-linux-gnu factorial.s runtime.o -o factorial.exe
+  $ llc-18 factorial.ll -o factorial.s
+  $ clang-18  --target=riscv64-linux-gnu factorial.s runtime.o -o factorial.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./factorial.exe
   24
 
@@ -106,8 +106,8 @@
   > let main = print_int (fib 6)
 
 
-  $ llc fibonacci.ll -o fibonacci.s
-  $ clang  --target=riscv64-linux-gnu -static fibonacci.s runtime.o -o fibonacci.exe
+  $ llc-18 fibonacci.ll -o fibonacci.s
+  $ clang-18  --target=riscv64-linux-gnu -static fibonacci.s runtime.o -o fibonacci.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./fibonacci.exe
   8
 
@@ -121,8 +121,8 @@
   >           then 0 else 1 in
   >   large x
 
-  $ llc ififif.ll -o ififif.s
-  $ clang  --target=riscv64-linux-gnu -static ififif.s runtime.o -o ififif.exe
+  $ llc-18 ififif.ll -o ififif.s
+  $ clang-18  --target=riscv64-linux-gnu -static ififif.s runtime.o -o ififif.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./ififif.exe
   42
   0
@@ -135,8 +135,8 @@
   > 
   > let main = print_int (partialapp_sum 5)
 
-  $ llc closure.ll -o closure.s
-  $ clang  --target=riscv64-linux-gnu -static closure.s runtime.o -o closure.exe
+  $ llc-18 closure.ll -o closure.s
+  $ clang-18  --target=riscv64-linux-gnu -static closure.s runtime.o -o closure.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./closure.exe
   10
 
@@ -144,8 +144,8 @@
 ====================== CPS Factorial ======================
   $ ../bin/XML_llvm.exe -fromfile manytests/typed/010faccps_ll.ml -o 010faccps_ll.ll
 
-  $ llc 010faccps_ll.ll -o 010faccps_ll.s
-  $ clang  --target=riscv64-linux-gnu -static 010faccps_ll.s runtime.o -o 010faccps_ll.exe
+  $ llc-18 010faccps_ll.ll -o 010faccps_ll.s
+  $ clang-18  --target=riscv64-linux-gnu -static 010faccps_ll.s runtime.o -o 010faccps_ll.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./010faccps_ll.exe
   24
 
@@ -153,8 +153,8 @@
 ====================== CPS Fibbo ======================
   $ ../bin/XML_llvm.exe -fromfile manytests/typed/010fibcps_ll.ml -o 010fibcps_ll.ll
 
-  $ llc 010fibcps_ll.ll -o 010fibcps_ll.s
-  $ clang  --target=riscv64-linux-gnu -static 010fibcps_ll.s runtime.o -o 010fibcps_ll.exe
+  $ llc-18 010fibcps_ll.ll -o 010fibcps_ll.s
+  $ clang-18  --target=riscv64-linux-gnu -static 010fibcps_ll.s runtime.o -o 010fibcps_ll.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./010fibcps_ll.exe
   8
 
@@ -163,8 +163,8 @@
 
   $ ../bin/XML_llvm.exe -fromfile ./manytests/typed/004manyargs.ml -o 004manyargs.ll
 
-  $ llc 004manyargs.ll -o 004manyargs.s
-  $ clang  --target=riscv64-linux-gnu -static 004manyargs.s runtime.o -o 004manyargs.exe
+  $ llc-18 004manyargs.ll -o 004manyargs.s
+  $ clang-18  --target=riscv64-linux-gnu -static 004manyargs.s runtime.o -o 004manyargs.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./004manyargs.exe
   1111111111
   1
@@ -181,8 +181,8 @@
   >   let (a, b) = p in
   >   print_int (a + b)
 
-  $ llc tuple_return.ll -o tuple_return.s
-  $ clang  --target=riscv64-linux-gnu -static tuple_return.s runtime.o -o tuple_return.exe
+  $ llc-18 tuple_return.ll -o tuple_return.s
+  $ clang-18  --target=riscv64-linux-gnu -static tuple_return.s runtime.o -o tuple_return.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./tuple_return.exe
   30
 
@@ -199,8 +199,8 @@
   >   let (x, y) = p2 in
   >   print_int x
 
-  $ llc tuple_swap.ll -o tuple_swap.s
-  $ clang  --target=riscv64-linux-gnu -static tuple_swap.s runtime.o -o tuple_swap.exe
+  $ llc-18 tuple_swap.ll -o tuple_swap.s
+  $ clang-18  --target=riscv64-linux-gnu -static tuple_swap.s runtime.o -o tuple_swap.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./tuple_swap.exe
   2
 
@@ -214,8 +214,8 @@
   >   let (a, b) = t in
   >   print_int (a + b)
 
-  $ llc tuple_order.ll -o tuple_order.s
-  $ clang  --target=riscv64-linux-gnu -static tuple_order.s runtime.o -o tuple_order.exe
+  $ llc-18 tuple_order.ll -o tuple_order.s
+  $ clang-18  --target=riscv64-linux-gnu -static tuple_order.s runtime.o -o tuple_order.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./tuple_order.exe
   30
 
@@ -231,8 +231,8 @@
   >   print_int (sum_list lst)
 
 
-  $ llc tuple_linked_list.ll -o tuple_linked_list.s
-  $ clang  --target=riscv64-linux-gnu -static tuple_linked_list.s runtime.o -o tuple_linked_list.exe
+  $ llc-18 tuple_linked_list.ll -o tuple_linked_list.s
+  $ clang-18  --target=riscv64-linux-gnu -static tuple_linked_list.s runtime.o -o tuple_linked_list.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./tuple_linked_list.exe
   60
 
@@ -244,8 +244,8 @@
   >   let (a, b, c, d, e, f, g, h, i, j) = t in
   >   print_int j
 
-  $ llc tuple_large.ll -o tuple_large.s
-  $ clang  --target=riscv64-linux-gnu -static tuple_large.s runtime.o -o tuple_large.exe
+  $ llc-18 tuple_large.ll -o tuple_large.s
+  $ clang-18  --target=riscv64-linux-gnu -static tuple_large.s runtime.o -o tuple_large.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./tuple_large.exe
   10
 
@@ -256,8 +256,8 @@
   >   let (a, b) = t in
   >   print_int (a + b)
 
-  $ llc tuple_basic.ll -o tuple_basic.s
-  $ clang  --target=riscv64-linux-gnu -static tuple_basic.s runtime.o -o tuple_basic.exe
+  $ llc-18 tuple_basic.ll -o tuple_basic.s
+  $ clang-18  --target=riscv64-linux-gnu -static tuple_basic.s runtime.o -o tuple_basic.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./tuple_basic.exe
   30
 
@@ -269,8 +269,8 @@
   >   print_int (a + b + c)
 
 
-  $ llc tuple_nested.ll -o tuple_nested.s
-  $ clang  --target=riscv64-linux-gnu -static tuple_nested.s runtime.o -o tuple_nested.exe
+  $ llc-18 tuple_nested.ll -o tuple_nested.s
+  $ clang-18  --target=riscv64-linux-gnu -static tuple_nested.s runtime.o -o tuple_nested.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./tuple_nested.exe
   123
 
@@ -285,8 +285,8 @@
   >   print_int (sum_pair p)
 
 
-  $ llc tuple_arg.ll -o tuple_arg.s
-  $ clang  --target=riscv64-linux-gnu  -static tuple_arg.s runtime.o -o tuple_arg.exe
+  $ llc-18 tuple_arg.ll -o tuple_arg.s
+  $ clang-18  --target=riscv64-linux-gnu  -static tuple_arg.s runtime.o -o tuple_arg.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./tuple_arg.exe
   42
 
@@ -302,8 +302,8 @@
   >   let _ = print_gc_status in
   >   print_int head
 
-  $ llc tuple_gc_stress.ll -o tuple_gc_stress.s
-  $ clang  --target=riscv64-linux-gnu  -static tuple_gc_stress.s runtime.o -o tuple_gc_stress.exe
+  $ llc-18 tuple_gc_stress.ll -o tuple_gc_stress.s
+  $ clang-18  --target=riscv64-linux-gnu  -static tuple_gc_stress.s runtime.o -o tuple_gc_stress.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./tuple_gc_stress.exe
   === GC Status ===
   Current allocated: 0

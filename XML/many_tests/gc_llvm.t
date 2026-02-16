@@ -1,4 +1,4 @@
-  $ clang --target=riscv64-linux-gnu --sysroot=/usr/riscv64-unknown-linux-gnu -c ./../bin/runtime.c -o runtime.o
+  $ clang-18 --target=riscv64-linux-gnu --sysroot=/usr/riscv64-unknown-linux-gnu -c ./../bin/runtime.c -o runtime.o
 
   $ dune exec ./../bin/XML_llvm.exe -- -o gc_smoke.ll <<EOF
   > let main =
@@ -6,9 +6,9 @@
   >   let _ = collect in
   >   print_gc_status
 
-  $ llc gc_smoke.ll -o gc_smoke.s
-  $ clang --target=riscv64-linux-gnu --sysroot=/usr/riscv64-unknown-linux-gnu -c ./../bin/runtime.c -o runtime.o
-  $ clang --target=riscv64-linux-gnu -static gc_smoke.s runtime.o -o gc_smoke.exe
+  $ llc-18 gc_smoke.ll -o gc_smoke.s
+  $ clang-18 --target=riscv64-linux-gnu --sysroot=/usr/riscv64-unknown-linux-gnu -c ./../bin/runtime.c -o runtime.o
+  $ clang-18 --target=riscv64-linux-gnu -static gc_smoke.s runtime.o -o gc_smoke.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./gc_smoke.exe
   === GC Status ===
   Current allocated: 0
@@ -45,8 +45,8 @@
   >   let _ = print_gc_status in
   >   print_int (f 8)
 
-  $ llc lots_of_garbage.ll -o lots_of_garbage.s
-  $ clang  --target=riscv64-linux-gnu -static lots_of_garbage.s runtime.o -o lots_of_garbage.exe
+  $ llc-18 lots_of_garbage.ll -o lots_of_garbage.s
+  $ clang-18  --target=riscv64-linux-gnu -static lots_of_garbage.s runtime.o -o lots_of_garbage.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./lots_of_garbage.exe
   === GC Status ===
   Current allocated: 0
@@ -95,8 +95,8 @@
   >   let _ = collect in
   >   print_int (f 7)
 
-  $ llc keep_block_across_gc.ll -o keep_block_across_gc.s
-  $ clang  --target=riscv64-linux-gnu -static keep_block_across_gc.s runtime.o -o keep_block_across_gc.exe
+  $ llc-18 keep_block_across_gc.ll -o keep_block_across_gc.s
+  $ clang-18  --target=riscv64-linux-gnu -static keep_block_across_gc.s runtime.o -o keep_block_across_gc.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./keep_block_across_gc.exe
   7
 
@@ -107,8 +107,8 @@
   >   let _ = alloc_block 10000000 in
   >   print_int 0
 
-  $ llc gc_oom_block.ll -o gc_oom_block.s
-  $ clang  --target=riscv64-linux-gnu -static gc_oom_block.s runtime.o -o gc_oom_block.exe
+  $ llc-18 gc_oom_block.ll -o gc_oom_block.s
+  $ clang-18  --target=riscv64-linux-gnu -static gc_oom_block.s runtime.o -o gc_oom_block.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./gc_oom_block.exe
   GC: out of memory: asked for 160000024 bytes, alloc_ptr is 0x2aaaab32d010 (end is 0x2aaaab3ad010)
   Aborted (core dumped)
@@ -129,8 +129,8 @@
   >   let _ = print_gc_status in
   >   print_int head
 
-  $ llc temp.ll -o temp.s
-  $ clang  --target=riscv64-linux-gnu -static temp.s runtime.o -o temp.exe
+  $ llc-18 temp.ll -o temp.s
+  $ clang-18  --target=riscv64-linux-gnu -static temp.s runtime.o -o temp.exe
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./temp.exe
   === GC Status ===
   Current allocated: 0
