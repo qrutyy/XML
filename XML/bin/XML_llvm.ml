@@ -18,6 +18,7 @@ type options =
   ; mutable show_anf : bool
   ; mutable show_cc : bool
   ; mutable show_ll : bool
+  ; mutable check_types : bool
   }
 
 (* ------------------------------- *)
@@ -41,6 +42,16 @@ let to_llvm_ir ast options =
 
 let compile_and_write options source_code =
   let ast = Common.Parser.parse_str source_code in
+  if options.check_types
+  then (
+    let typedtree =
+      Middleend.Infer.run_infer_program ast Middleend.Infer.env_with_things
+    in
+    match typedtree with
+    | Error err ->
+      Format.printf "Type error: %a\n" Middleend.InferTypes.pp_inf_err err;
+      exit 1
+    | Ok (_, _) -> ());
   if options.show_ast
   then (
     (* printf "%a\n" Common.Pprinter.pprint_program ast; *)
@@ -114,6 +125,7 @@ let () =
     ; show_ll = false
     ; optimization_lvl = None
     ; target = "riscv64-unknown-linux-gnu"
+    ; check_types = true
     }
   in
   let usage_msg =
@@ -150,6 +162,9 @@ let () =
     ; ( "-t"
       , Arg.String (fun targ -> options.target <- targ)
       , "         Set target platform, \"riscv64-unknown-linux-gnu\" by default" )
+    ; ( "-notypes"
+      , Arg.Unit (fun () -> options.check_types <- false)
+      , "         Do not typecheck the program before compilation" )
     ]
   in
   let handle_anon_arg filename =

@@ -17,6 +17,7 @@ type options =
   ; mutable show_cc : bool
   ; mutable show_ll : bool
   ; mutable gc_stats : bool
+  ; mutable check_types : bool
   }
 
 (* ------------------------------- *)
@@ -36,6 +37,16 @@ let to_asm ~gc_stats ast : string =
 
 let compile_and_write options source_code =
   let ast = Common.Parser.parse_str source_code in
+  if options.check_types
+  then (
+    let typedtree =
+      Middleend.Infer.run_infer_program ast Middleend.Infer.env_with_things
+    in
+    match typedtree with
+    | Error err ->
+      Format.printf "Type error: %a\n" Middleend.InferTypes.pp_inf_err err;
+      exit 1
+    | Ok (_, _) -> ());
   if options.show_ast
   then (
     printf "%a\n" Common.Pprinter.pprint_program ast;
@@ -106,6 +117,7 @@ let () =
     ; show_cc = false
     ; show_ll = false
     ; gc_stats = false
+    ; check_types = true
     }
   in
   let usage_msg =
@@ -136,6 +148,9 @@ let () =
     ; ( "--gc-stats"
       , Arg.Unit (fun () -> options.gc_stats <- true)
       , "     Enable GC statistics and force a collection at program start/end" )
+    ; ( "-notypes"
+      , Arg.Unit (fun () -> options.check_types <- false)
+      , "         Do not typecheck the program before compilation" )
     ]
   in
   let handle_anon_arg filename =

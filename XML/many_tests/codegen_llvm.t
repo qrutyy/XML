@@ -220,7 +220,7 @@
   30
 
 
-  $ ../bin/XML_llvm.exe -o tuple_linked_list.ll <<EOF
+  $ dune exec -- ../bin/XML_llvm.exe -o tuple_linked_list.ll -notypes <<EOF
   > let rec sum_list lst =
   >   if lst = 0 then 0 else
   >   let (head, tail) = lst in
@@ -290,7 +290,7 @@
   $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./tuple_arg.exe
   42
 
-  $ ../bin/XML_llvm.exe -o tuple_gc_stress.ll <<EOF
+  $ dune exec -- ../bin/XML_llvm.exe -o tuple_gc_stress.ll -notypes <<EOF
   > let rec make_list n acc =
   >   if n = 0 then acc else
   >   make_list (n - 1) (n, acc)

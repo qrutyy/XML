@@ -117,7 +117,7 @@
 
 
 
-  $ ../bin/XML_llvm.exe -o temp.ll <<EOF
+  $ dune exec -- ../bin/XML_llvm.exe -o temp.ll -notypes <<EOF
   > let rec make_list n acc =
   >   if n = 0 then acc else
   >   make_list (n - 1) (n, acc)
