@@ -11,11 +11,101 @@ type typ =
   | Type_tuple of typ List2.t
   | Type_var of tv ref
   | Quant_type_var of ident
-  | Type_construct of ident * typ list
+  | Type_construct of ident * typ list [@deriving]
+[@@deriving eq, show { with_path = false }]
 
 and tv =
   | Unbound of ident
   | Link of typ
+[@@deriving eq, show { with_path = false }]
+
+let rec pprint_type_tuple ?(poly_names_map = Base.Map.empty (module Base.String)) fmt =
+  let open Format in
+  function
+  | [] -> ()
+  | [ h ] ->
+    (match h with
+     | Type_arrow (_, _) -> fprintf fmt "(%a)" (pprint_typ ~poly_names_map) h
+     | _ -> fprintf fmt "%a" (pprint_typ ~poly_names_map) h)
+  | h :: tl ->
+    (match h with
+     | Type_arrow (_, _) ->
+       fprintf
+         fmt
+         "(%a) * %a"
+         (pprint_typ ~poly_names_map)
+         h
+         (pprint_type_tuple ~poly_names_map)
+         tl
+     | _ ->
+       fprintf
+         fmt
+         "%a * %a"
+         (pprint_typ ~poly_names_map)
+         h
+         (pprint_type_tuple ~poly_names_map)
+         tl)
+
+and pprint_type_list_with_parens
+      ?(poly_names_map = Base.Map.empty (module Base.String))
+      fmt
+      ty_list
+  =
+  let open Format in
+  let rec print_types fmt = function
+    | [] -> ()
+    | [ ty ] -> (pprint_type_with_parens_if_tuple ~poly_names_map) fmt ty
+    | ty :: rest ->
+      fprintf
+        fmt
+        "%a %a"
+        (pprint_type_with_parens_if_tuple ~poly_names_map)
+        ty
+        print_types
+        rest
+  in
+  print_types fmt ty_list
+
+and pprint_typ fmt ?(poly_names_map = Base.Map.empty (module Base.String)) =
+  let open Format in
+  function
+  | Type_arrow (t1, t2) ->
+    fprintf
+      fmt
+      "(%a -> %a)"
+      (pprint_typ ~poly_names_map)
+      t1
+      (pprint_typ ~poly_names_map)
+      t2
+  | Type_tuple (t1, t2, tl) ->
+    fprintf
+      fmt
+      "(%s)"
+      (String.concat
+         " * "
+         (List.map
+            (fun t -> asprintf "%a" (pprint_typ ~poly_names_map) t)
+            (t1 :: t2 :: tl)))
+  | Type_var { contents = Unbound id } ->
+    (match Base.Map.find poly_names_map id with
+     | Some k -> fprintf fmt "'%s" k
+     | None -> fprintf fmt "'%s" id)
+  | Type_var { contents = Link t } -> pprint_typ fmt t
+  | Quant_type_var id -> fprintf fmt "'%s" id
+  | Type_construct (name, []) -> fprintf fmt "%s" name
+  | Type_construct (name, ty_list) ->
+    fprintf fmt "%a %s" (pprint_type_list_with_parens ~poly_names_map) ty_list name
+
+and pprint_type_with_parens_if_tuple
+      ?(poly_names_map = Base.Map.empty (module Base.String))
+      fmt
+      ty
+  =
+  let open Format in
+  match ty with
+  | Type_tuple _ -> fprintf fmt "(%a)" (pprint_typ ~poly_names_map) ty
+  | _ -> (pprint_typ ~poly_names_map) fmt ty
+;;
 
 let rec occurs_check tv = function
   | Type_var tv' when tv == tv' -> failwith "occurs check"
@@ -44,7 +134,7 @@ let rec unify t1 t2 =
     List.map2 unify (l1 :: l2 :: ltl) (r1 :: r2 :: rtl) |> ignore
   | Type_construct (lc, llst), Type_construct (rc, rlst) ->
     if lc <> rc
-    then failwith "can't unify different constructors"
+    then failwith ("can't unify different constructors: " ^ lc ^ " and " ^ rc)
     else List.map2 unify llst rlst |> ignore
   | _ -> failwith "error"
 ;;
@@ -114,20 +204,98 @@ let inst =
   fun ty -> fst (loop [] ty)
 ;;
 
+let rec infer_pat env = function
+  | Pat_any ->
+    let fresh = newvar () in
+    env, fresh
+  | Pat_var id ->
+    let fresh = newvar () in
+    let new_env = (id, fresh) :: env in
+    new_env, fresh
+  | Pat_constant const ->
+    (match const with
+     | Const_char _ -> env, Type_construct ("char", [])
+     | Const_integer _ -> env, Type_construct ("int", [])
+     | Const_string _ -> env, Type_construct ("string", []))
+  | Pat_tuple (p1, p2, ptl) ->
+    let new_env, ty1 = infer_pat env p1 in
+    let new_env1, ty2 = infer_pat new_env p2 in
+    let new_env2, tytl =
+      List.fold_left
+        (fun (eacc, tacc) exp ->
+           let curr_env, ty = infer_pat eacc exp in
+           curr_env, ty :: tacc)
+        (new_env1, [])
+        ptl
+    in
+    new_env2, Type_tuple (ty1, ty2, List.rev tytl)
+  | Pat_construct (name, pat) ->
+    let ty = List.assoc name env in
+    let inst_ty = inst ty in
+    (match ty, pat with
+     | Type_arrow (arg, body), Some p ->
+       let new_env, new_ty = infer_pat env p in
+       unify arg new_ty;
+       new_env, body
+     | _ -> env, inst_ty)
+  (* | Pat_constraint (p, ty) ->
+    let new_env, new_ty = infer_pat env p in
+    unify ty new_ty;
+    new_env, new_ty *)
+  | _ -> failwith "infer pat not implemented"
+;;
+
 let rec infer_exp env = function
-  | Exp_ident id -> inst (List.assoc id env)
-  | Exp_fun ((Pat_var id, []), exp) ->
-    let typ_id = newvar () in
-    let typ_exp = infer_exp ((id, typ_id) :: env) exp in
-    Type_arrow (typ_id, typ_exp)
+  | Exp_ident id -> env, inst (List.assoc id env)
+  | Exp_constant const ->
+    (match const with
+     | Const_char _ -> env, Type_construct ("char", [])
+     | Const_integer _ -> env, Type_construct ("int", [])
+     | Const_string _ -> env, Type_construct ("string", []))
+  | Exp_fun ((pat, []), exp) ->
+    let new_env, typ_p = infer_pat env pat in
+    let new_env1, typ_exp = infer_exp new_env exp in
+    new_env1, Type_arrow (typ_p, typ_exp)
   | Exp_apply (f, arg) ->
-    let typ_f = infer_exp env f in
-    let typ_arg = infer_exp env arg in
+    let new_env, typ_f = infer_exp env f in
+    let new_env1, typ_arg = infer_exp new_env arg in
     let typ_res = newvar () in
     unify typ_f (Type_arrow (typ_arg, typ_res));
-    typ_res
-  | Exp_let (Nonrecursive, ({ pat = Pat_var id; expr }, []), exprb) ->
-    let typ_e = infer_exp env expr in
-    infer_exp ((id, gen typ_e) :: env) exprb
+    new_env1, typ_res
+  | Exp_let (Nonrecursive, ({ pat; expr }, []), exprb) ->
+    let new_env, typ_p = infer_pat env pat in
+    let new_env1, typ_e = infer_exp new_env expr in
+    infer_exp new_env1 exprb
+  | Exp_construct (name, Some exp) -> infer_exp env (Exp_apply (Exp_ident name, exp))
+  | Exp_construct (name, None) -> infer_exp env (Exp_ident name)
+  | Exp_tuple (e1, e2, etl) ->
+    let new_env, ty1 = infer_exp env e1 in
+    let new_env1, ty2 = infer_exp new_env e2 in
+    let new_env2, tytl =
+      List.fold_left
+        (fun (eacc, tacc) exp ->
+           let curr_env, ty = infer_exp eacc exp in
+           curr_env, ty :: tacc)
+        (new_env1, [])
+        etl
+    in
+    new_env2, Type_tuple (ty1, ty2, List.rev tytl)
+  | Exp_if (cond, the, els) ->
+    let new_env, ty1 = infer_exp env cond in
+    unify ty1 (Type_construct ("bool", []));
+    let new_env1, ty2 = infer_exp new_env the in
+    (match els with
+     | None ->
+       unify ty2 (Type_construct ("unit", []));
+       new_env1, ty2
+     | Some els ->
+       let new_env, ty3 = infer_exp new_env1 els in
+       unify ty2 ty3;
+       new_env, ty3)
+  (* | Exp_constraint (exp, ty) ->
+    let new_env, new_ty = infer_exp env exp in
+    unify ty new_ty;
+    new_env new_ty *)
+  (* |Exp_match _ |Exp_function _ -> *)
   | _ -> failwith "infer exp not implemented"
 ;;
