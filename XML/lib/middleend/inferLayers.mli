@@ -25,4 +25,6 @@ val pprint_typ
   -> typ
   -> unit
 
+val reset_gensym : unit -> unit
 val infer_exp : (ident * typ) list -> Expression.t -> (ident * typ) list * typ
+val infer_pat : (ident * typ) list -> Pattern.t -> (ident * typ) list * typ
