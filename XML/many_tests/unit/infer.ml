@@ -69,10 +69,10 @@ let%expect_test "str" =
 
    Not_found
    Raised at Stdlib__List.assoc in file "list.ml", line 191, characters 10-25
-   Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 249, characters 30-49
-   Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 14, characters 21-38
-   Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 25, characters 44-76
-   Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 63, characters 1-35
+   Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 262, characters 30-49
+   Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
+   Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
+   Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 71, characters 1-35
    Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}];;
 
 
@@ -120,10 +120,10 @@ let%expect_test "if (string) " =
 
   (Failure "can't unify different constructors: string and bool")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 288, characters 4-43
-  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 14, characters 21-38
-  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 25, characters 44-76
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 115, characters 2-107
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 298, characters 4-43
+  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
+  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 123, characters 2-107
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -138,10 +138,10 @@ let%expect_test "if (bool) then (not unit)" =
 
   (Failure "can't unify different constructors: int and unit")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 292, characters 7-46
-  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 14, characters 21-38
-  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 25, characters 44-76
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 132, characters 2-89
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 302, characters 7-46
+  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
+  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 140, characters 2-89
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -181,10 +181,10 @@ let%expect_test "apply int -> int to string" =
     (Failure "can't unify different constructors: int and string")
     Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
     Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 131, characters 4-15
-    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 263, characters 4-47
-    Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 14, characters 21-38
-    Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 25, characters 44-76
-    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 174, characters 2-65
+    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 280, characters 4-47
+    Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
+    Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
+    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 182, characters 2-65
     Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -194,13 +194,13 @@ let%expect_test "apply 'a -> 'a to 'b" =
   [%expect{| 'b |}]
 
 
-
+  (* not sure if this is right *)
 let%expect_test "apply 'a to 'a (different vars)" =
   let env = ["f", Type_var {contents = Unbound "t"}; "x", Type_var {contents = Unbound "t"}] in
   inf_pprint_etyp env (Exp_apply (Exp_ident "f", Exp_ident "x") ) ~rst:false;
   [%expect {| 'c |}]
 
-(* 
+
 let%expect_test "apply 'a to 'a (same var)" =
   let env = ["x", Type_var {contents = Unbound "t"}] in
   inf_pprint_etyp env (Exp_apply (Exp_ident "x", Exp_ident "x") ) ~rst:false;
@@ -214,17 +214,17 @@ let%expect_test "apply 'a to 'a (same var)" =
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
   Called from Middleend__InferLayers.occurs_check in file "lib/middleend/inferLayers.ml", line 114, characters 4-22
   Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 128, characters 4-22
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 263, characters 4-47
-  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 14, characters 21-38
-  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 25, characters 42-74
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 178, characters 2-76
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}] *)
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 280, characters 4-47
+  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
+  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 214, characters 2-76
+  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
-(* 
+
 let%expect_test "apply 'a to 'b" =
   let env = ["f", Type_var {contents = Unbound "s"}; "x", Type_var {contents = Unbound "t"}] in
   inf_pprint_etyp env (Exp_apply (Exp_ident "f", Exp_ident "x") ) ~rst:false;
-  [%expect{| 'd |}] *)
+  [%expect{| 'e |}]
 
 
 (************************** Patterns **************************)
@@ -295,7 +295,7 @@ let%expect_test "tuples in tuple" =
  [%expect {| 'n option |}]
 
 
-(************************** Mixed **************************)
+(************************** Funs **************************)
 
 let%expect_test "fun 'a -> 'a (new var)" =
  inf_pprint_etyp [] (Exp_fun ((Pat_var "x", []), Exp_ident "x"));
@@ -317,11 +317,11 @@ let%expect_test "fun 'a -> 'b (not in env)" =
 
   Not_found
   Raised at Stdlib__List.assoc in file "list.ml", line 191, characters 10-25
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 249, characters 30-49
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 257, characters 28-49
-  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 14, characters 21-38
-  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 25, characters 44-76
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 311, characters 1-64
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 262, characters 30-49
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 273, characters 14-35
+  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
+  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 319, characters 1-64
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -330,21 +330,134 @@ let%expect_test "fun 'a -> 'b (in env)" =
   [%expect{| ('a -> 's) |}]
 
 
-  (* does not halt! *)
-(* let%expect_test "fun x -> fun y -> x y;;" =
+let%expect_test "fun x -> fun y -> x y;;" =
   inf_pprint_etyp [] (Exp_fun((Pat_var "x", []), Exp_fun((Pat_var "y", []), Exp_apply(Exp_ident "x", Exp_ident "y"))));
-  [%expect{| 'a |}] *)
+  [%expect{| (('b -> 'c) -> ('b -> 'c)) |}]
 
 
-    (* TODO *)
-  (* let%expect_test {| (fun f a b -> f a, f b) (fun x -> x) 1 "mystr" |} =
-  inf_pprint_etyp [] (Exp_ident "a");
+let%expect_test "fun x y -> x y;;" =
+  inf_pprint_etyp [] (Exp_fun((Pat_var "x", [Pat_var "y"]), Exp_apply(Exp_ident "x", Exp_ident "y")));
+  [%expect{| (('b -> 'c) -> ('b -> 'c)) |}]
+
+
+let%expect_test {| (fun f a b -> f a, f b) (fun x -> x) 1 "mystr" |} =
+  inf_pprint_etyp [] 
+  (Exp_apply
+    (Exp_apply(
+      (Exp_apply
+        (Exp_fun ((Pat_var "f", [Pat_var "a"; Pat_var "b"]), Exp_tuple (Exp_apply (Exp_ident "f", Exp_ident "a"), Exp_apply (Exp_ident "f", Exp_ident "b"), [])),
+        Exp_fun ((Pat_var "x", []), Exp_ident "x"))),
+       Exp_constant (Const_integer 1)),
+     Exp_constant (Const_string "mystr")));
   [%expect.unreachable]
- *)
+  [@@expect.uncaught_exn {|
+    (* CR expect_test_collector: This test expectation appears to contain a backtrace.
+       This is strongly discouraged as backtraces are fragile.
+       Please change this test to not include a backtrace. *)
 
- (************************** Structure items **************************)
+    (Failure "can't unify different constructors: int and string")
+    Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
+    Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 131, characters 4-15
+    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 280, characters 4-47
+    Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
+    Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
+    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 352, characters 2-366
+    Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
-  (************************** Programs **************************)
+
+(************************** Let in **************************)
+
+let%expect_test "let 1 = 1 in 2" =
+  inf_pprint_etyp [] (Exp_let (Nonrecursive, ({pat = Pat_constant (Const_integer 1); expr = Exp_constant (Const_integer 1)}, []), Exp_constant (Const_integer 2)));
+  [%expect{| int |}]
+
+
+let%expect_test "let _ = 1 in 2" =
+  inf_pprint_etyp [] (Exp_let (Nonrecursive, ({pat = Pat_any; expr = Exp_constant (Const_integer 1)}, []), Exp_constant (Const_integer 2)));
+  [%expect{| int |}]
+
+
+let%expect_test "let a = 1 in a" =
+  inf_pprint_etyp [] (Exp_let (Nonrecursive, ({pat = Pat_var "a"; expr = Exp_constant (Const_integer 1)}, []), Exp_ident "a"));
+  [%expect{| int |}]
+
+
+let%expect_test {| let a = 1 in "str" |} =
+  inf_pprint_etyp [] (Exp_let (Nonrecursive, ({pat = Pat_var "a"; expr = Exp_constant (Const_integer 1)}, []), Exp_constant (Const_string "str")));
+  [%expect{| string |}]
+
+
+let%expect_test {| let a = fun x -> x in a |} =
+  inf_pprint_etyp [] (Exp_let (Nonrecursive,
+  ({pat = Pat_var "a"; expr = Exp_fun ((Pat_var "x", []), Exp_ident "x")}, []), Exp_ident "a"));
+  [%expect{| ('c -> 'c) |}]
+
+
+let%expect_test {| let a = fun x -> x in (a 1, a "str") |} =
+  inf_pprint_etyp [] (Exp_let (Nonrecursive,
+  ({pat = Pat_var "a"; expr = Exp_fun ((Pat_var "x", []), Exp_ident "x")}, []),
+  Exp_tuple(Exp_apply(Exp_ident "a", Exp_constant (Const_integer 1)),
+            Exp_apply (Exp_ident "a", Exp_constant (Const_string "str")), [])));
+  [%expect{| (int * string) |}]
+
+
+let%expect_test {| let a, b = 1, 2 in a |} =
+  inf_pprint_etyp [] (Exp_let (Nonrecursive,
+  ({pat = Pat_tuple (Pat_var "a", Pat_var "b", []); expr = Exp_tuple (Exp_constant (Const_integer 1), Exp_constant (Const_integer 2), [])}, []), Exp_ident "a"));
+  [%expect{| int |}]
+
+
+let%expect_test {| let a, b, c = 1, 2 in a |} =
+  inf_pprint_etyp [] (Exp_let (Nonrecursive,
+  ({pat = Pat_tuple (Pat_var "a", Pat_var "b", [Pat_var "c"]); expr = Exp_tuple (Exp_constant (Const_integer 1), Exp_constant (Const_integer 2), [])}, []), Exp_ident "a"));
+  [%expect.unreachable]
+[@@expect.uncaught_exn {|
+  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
+     This is strongly discouraged as backtraces are fragile.
+     Please change this test to not include a backtrace. *)
+
+  (Failure "cannot unify tuple types of different size")
+  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
+  Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 135, characters 9-62
+  Called from Middleend__InferLayers.infer_vb in file "lib/middleend/inferLayers.ml", line 258, characters 2-32
+  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 309, characters 18-84
+  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
+  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 420, characters 2-216
+  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+
+
+  let%expect_test {| let a, b = 1, 2, 3 in a |} =
+  inf_pprint_etyp [] (Exp_let (Nonrecursive,
+  ({pat = Pat_tuple (Pat_var "a", Pat_var "b", []); expr = Exp_tuple (Exp_constant (Const_integer 1), Exp_constant (Const_integer 2), [Exp_constant (Const_integer 3)])}, []), Exp_ident "a"));
+  [%expect.unreachable]
+  [@@expect.uncaught_exn {|
+    (* CR expect_test_collector: This test expectation appears to contain a backtrace.
+       This is strongly discouraged as backtraces are fragile.
+       Please change this test to not include a backtrace. *)
+
+    (Failure "cannot unify tuple types of different size")
+    Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
+    Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 135, characters 9-62
+    Called from Middleend__InferLayers.infer_vb in file "lib/middleend/inferLayers.ml", line 258, characters 2-32
+    Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
+    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 309, characters 18-84
+    Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
+    Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
+    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 440, characters 2-235
+    Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+
+
+let%expect_test {| let a = 1 and b = "punk" in b |} =
+  inf_pprint_etyp [] (Exp_let (Nonrecursive,
+  ({pat = Pat_var "a"; expr = Exp_constant (Const_integer 1)},
+  [{pat = Pat_var "b"; expr = Exp_constant (Const_string "punk")}]), Exp_ident "b"));
+  [%expect{| string |}]
+
+(************************** Structure items **************************)
+
+(************************** Programs **************************)
 (* 
   план такой: дописать тесты на все, что реализовано выше, исправить по необходимости.
   затем доделать инфер c failwith и без левелов.

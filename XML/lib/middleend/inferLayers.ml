@@ -131,20 +131,27 @@ let rec unify t1 t2 =
     unify l1 r1;
     unify l2 r2
   | Type_tuple (l1, l2, ltl), Type_tuple (r1, r2, rtl) ->
+    if List.length ltl <> List.length rtl
+    then failwith "cannot unify tuple types of different size";
     List.map2 unify (l1 :: l2 :: ltl) (r1 :: r2 :: rtl) |> ignore
   | Type_construct (lc, llst), Type_construct (rc, rlst) ->
     if lc <> rc
     then failwith ("can't unify different constructors: " ^ lc ^ " and " ^ rc)
     else List.map2 unify llst rlst |> ignore
-  | _ -> failwith "error"
+  | Quant_type_var _, _ | _, Quant_type_var _ ->
+    failwith "cannot unify with a quantified type"
+  | _ -> failwith "cannot unify types"
 ;;
 
-let rec gen : typ -> typ = function
+(* | _ -> failwith "error" *)
+
+let rec generalize : typ -> typ = function
   | Type_var { contents = Unbound name } -> Quant_type_var name
-  | Type_var { contents = Link ty } -> gen ty
-  | Type_arrow (ty1, ty2) -> Type_arrow (gen ty1, gen ty2)
-  | Type_tuple (t1, t2, tl) -> Type_tuple (gen t1, gen t2, List.map gen tl)
-  | Type_construct (c, lst) -> Type_construct (c, List.map gen lst)
+  | Type_var { contents = Link ty } -> generalize ty
+  | Type_arrow (ty1, ty2) -> Type_arrow (generalize ty1, generalize ty2)
+  | Type_tuple (t1, t2, tl) ->
+    Type_tuple (generalize t1, generalize t2, List.map generalize tl)
+  | Type_construct (c, lst) -> Type_construct (c, List.map generalize lst)
   | ty -> ty
 ;;
 
@@ -245,27 +252,33 @@ let rec infer_pat env = function
   | _ -> failwith "infer pat not implemented"
 ;;
 
-let rec infer_exp env = function
+let rec infer_vb env { pat; expr } =
+  let new_env, typ_p = infer_pat env pat in
+  let new_env1, typ_e = infer_exp new_env expr in
+  unify typ_p (generalize typ_e);
+  new_env1
+
+and infer_exp env = function
   | Exp_ident id -> env, inst (List.assoc id env)
   | Exp_constant const ->
     (match const with
      | Const_char _ -> env, Type_construct ("char", [])
      | Const_integer _ -> env, Type_construct ("int", [])
      | Const_string _ -> env, Type_construct ("string", []))
-  | Exp_fun ((pat, []), exp) ->
+  | Exp_fun ((pat, pats), exp) ->
     let new_env, typ_p = infer_pat env pat in
-    let new_env1, typ_exp = infer_exp new_env exp in
-    new_env1, Type_arrow (typ_p, typ_exp)
+    let newest_env, typ_exp =
+      match pats with
+      | hd :: tl -> infer_exp new_env (Exp_fun ((hd, tl), exp))
+      | [] -> infer_exp new_env exp
+    in
+    newest_env, Type_arrow (typ_p, typ_exp)
   | Exp_apply (f, arg) ->
     let new_env, typ_f = infer_exp env f in
     let new_env1, typ_arg = infer_exp new_env arg in
     let typ_res = newvar () in
     unify typ_f (Type_arrow (typ_arg, typ_res));
     new_env1, typ_res
-  | Exp_let (Nonrecursive, ({ pat; expr }, []), exprb) ->
-    let new_env, typ_p = infer_pat env pat in
-    let new_env1, typ_e = infer_exp new_env expr in
-    infer_exp new_env1 exprb
   | Exp_construct (name, Some exp) -> infer_exp env (Exp_apply (Exp_ident name, exp))
   | Exp_construct (name, None) -> infer_exp env (Exp_ident name)
   | Exp_tuple (e1, e2, etl) ->
@@ -292,6 +305,12 @@ let rec infer_exp env = function
        let new_env, ty3 = infer_exp new_env1 els in
        unify ty2 ty3;
        new_env, ty3)
+  | Exp_let (Nonrecursive, (vb, vbs), exprb) ->
+    let new_env = List.fold_left (fun env bind -> infer_vb env bind) env (vb :: vbs) in
+    infer_exp new_env exprb
+  | Exp_let (Recursive, (vb, vbs), exprb) ->
+    let new_env = List.fold_left (fun env bind -> infer_vb env bind) env (vb :: vbs) in
+    infer_exp new_env exprb
   (* | Exp_constraint (exp, ty) ->
     let new_env, new_ty = infer_exp env exp in
     unify ty new_ty;
@@ -299,3 +318,6 @@ let rec infer_exp env = function
   (* |Exp_match _ |Exp_function _ -> *)
   | _ -> failwith "infer exp not implemented"
 ;;
+
+(* нужно реализовать матчи, фанкшены, леты. затем протестить,
+что все работает, как надо, затем добавлять левела *)
