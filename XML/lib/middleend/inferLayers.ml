@@ -140,7 +140,7 @@ let rec unify t1 t2 =
     else List.map2 unify llst rlst |> ignore
   | Quant_type_var _, _ | _, Quant_type_var _ ->
     failwith "cannot unify with a quantified type"
-  | _ -> failwith "cannot unify types"
+  | _ -> failwith ("cannot unify types: " ^ show_typ t1 ^ "and: " ^ show_typ t2)
 ;;
 
 (* | _ -> failwith "error" *)
@@ -252,14 +252,45 @@ let rec infer_pat env = function
   | _ -> failwith "infer pat not implemented"
 ;;
 
+let add_rec_names env vb_list =
+  List.fold_left
+    (fun cenv { pat; _ } ->
+       match pat with
+       | Pat_var id | Pat_constraint (Pat_var id, _) ->
+         let ncenv, typ_p = infer_pat cenv pat in
+         (id, typ_p) :: ncenv
+       | _ ->
+         failwith
+           "only variables are allowed as left-hand side of 'let rec' (during adding rec \
+            names)"
+       (* let fresh = newvar () in *))
+    env
+    vb_list
+;;
+
 let rec infer_vb env { pat; expr } =
   let new_env, typ_p = infer_pat env pat in
   let new_env1, typ_e = infer_exp new_env expr in
   unify typ_p (generalize typ_e);
   new_env1
 
+and infer_vb_rec env { pat; expr } =
+  match pat with
+  | Pat_var id | Pat_constraint (Pat_var id, _) ->
+    let new_env, typ_p = infer_pat env pat in
+    let new_env = (id, typ_p) :: new_env in
+    let new_env1, typ_e = infer_exp new_env expr in
+    (* unify typ_p (generalize typ_e); *)
+    unify typ_p typ_e;
+    unify typ_p (generalize typ_e);
+    new_env1
+  | _ -> failwith "only variables are allowed as left-hand side of 'let rec'"
+
 and infer_exp env = function
-  | Exp_ident id -> env, inst (List.assoc id env)
+  | Exp_ident id ->
+    (match List.assoc_opt id env with
+     | Some ty -> env, inst ty
+     | None -> failwith ("unbound variable: " ^ id))
   | Exp_constant const ->
     (match const with
      | Const_char _ -> env, Type_construct ("char", [])
@@ -273,6 +304,25 @@ and infer_exp env = function
       | [] -> infer_exp new_env exp
     in
     newest_env, Type_arrow (typ_p, typ_exp)
+  | Exp_apply (Exp_ident op, Exp_tuple (exp1, exp2, [])) ->
+    (match op with
+     | "*" | "/" | "+" | "-" | "<" | ">" | "=" | "<>" | "<=" | ">=" | "&&" | "||" ->
+       let new_env, typ1 = infer_exp env exp1 in
+       let new_env1, typ2 = infer_exp new_env exp2 in
+       let arg_typ, res_typ =
+         match List.assoc_opt op env with
+         | Some (Type_arrow (arg, Type_arrow (_, res))) -> arg, res
+         | _ -> failwith ("operator was not found in env: " ^ op)
+       in
+       unify typ1 arg_typ;
+       unify typ2 arg_typ;
+       new_env1, res_typ
+     | _ ->
+       let new_env, typ_op = infer_exp env (Exp_ident op) in
+       let new_env1, typ_args = infer_exp new_env (Exp_tuple (exp1, exp2, [])) in
+       let typ_res = newvar () in
+       unify typ_op (Type_arrow (typ_args, typ_res));
+       new_env1, typ_res)
   | Exp_apply (f, arg) ->
     let new_env, typ_f = infer_exp env f in
     let new_env1, typ_arg = infer_exp new_env arg in
@@ -309,8 +359,11 @@ and infer_exp env = function
     let new_env = List.fold_left (fun env bind -> infer_vb env bind) env (vb :: vbs) in
     infer_exp new_env exprb
   | Exp_let (Recursive, (vb, vbs), exprb) ->
-    let new_env = List.fold_left (fun env bind -> infer_vb env bind) env (vb :: vbs) in
-    infer_exp new_env exprb
+    let new_env = add_rec_names env (vb :: vbs) in
+    let new_env1 =
+      List.fold_left (fun env bind -> infer_vb_rec env bind) new_env (vb :: vbs)
+    in
+    infer_exp new_env1 exprb
   (* | Exp_constraint (exp, ty) ->
     let new_env, new_ty = infer_exp env exp in
     unify ty new_ty;
