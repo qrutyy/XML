@@ -126,7 +126,7 @@ let rec unify t1 t2 =
   | Type_var ({ contents = Unbound _ } as tv), t'
   | t', Type_var ({ contents = Unbound _ } as tv) ->
     occurs_check tv t';
-    tv := Link t1
+    tv := Link t'
   | Type_arrow (l1, l2), Type_arrow (r1, r2) ->
     unify l1 r1;
     unify l2 r2
