@@ -2,30 +2,24 @@
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
-open Middleend.InferTypes
 open Middleend.InferLayers
 open Common.Ast.Constant
 open Common.Ast.Expression
+open Common.Parser
 
 (* TODO: get rid of failwith in infer *)
 
-let inf_pprint_etyp_env ?(rst=true) env exp =
+let infer_exp_str ?(rst = true) ?(env = []) str =
+  let exp = parse_exp_str str in
   if rst then reset_gensym ();
-   let new_env, ty = infer_exp env exp in
-  pprint_typ Format.std_formatter ty;
-  new_env
+  let _, ty = infer_exp env exp in
+  pprint_typ Format.std_formatter ty;;
 
-
-let inf_pprint_ptyp_env ?(rst=true) env pat =
+let infer_pat_str ?(rst = true) ?(env = []) str =
+  let pat = parse_pat_str str in
   if rst then reset_gensym ();
-  let new_env, ty = infer_pat env pat in
-  pprint_typ Format.std_formatter ty;
-  new_env
-
-let inf_pprint_etyp ?(rst = true) env exp = inf_pprint_etyp_env ~rst env exp |> ignore
-
-let inf_pprint_ptyp ?(rst = true) env pat = inf_pprint_ptyp_env ~rst env pat |> ignore
-
+  let _, ty = infer_pat env pat in
+  pprint_typ Format.std_formatter ty;;
 
 let show_etyp env exp =
   let _, ty = infer_exp env exp in
@@ -40,27 +34,27 @@ let type_string = Type_construct ("string", [])
 (************************** Expressions **************************)
 
 let%expect_test "char" =
- inf_pprint_etyp [] (Exp_constant (Const_char 'a'));
- [%expect {| char |}];;
+  infer_exp_str {| 'a' |};
+  [%expect{| char |}]
 
 
 let%expect_test "int" =
- inf_pprint_etyp [] (Exp_constant (Const_integer 1));
- [%expect {| int |}];;
+  infer_exp_str {| 1 |};
+  [%expect{| int |}]
 
 
 let%expect_test "str" =
- inf_pprint_etyp [] (Exp_constant (Const_string "Kakadu"));
- [%expect {| string |}];;
+  infer_exp_str {| "Kakadu" |};
+  [%expect{| string |}]
 
 
- let%expect_test "id in env" =
- let env = ["m", (Type_var {contents = Unbound "a"})] in
- inf_pprint_etyp env (Exp_ident "m");
- [%expect {| 'a |}];;
+let%expect_test "id in env" =
+  infer_exp_str {| m |} ~env:[("m", Type_var {contents = Unbound "a"})];
+  [%expect{| 'a |}]
 
- let%expect_test "id not in env" =
- inf_pprint_etyp [] (Exp_ident "m");
+
+let%expect_test "id not in env" =
+  infer_exp_str {| m |};
  [%expect.unreachable]
  [@@expect.uncaught_exn {|
    (* CR expect_test_collector: This test expectation appears to contain a backtrace.
@@ -70,50 +64,46 @@ let%expect_test "str" =
    Not_found
    Raised at Stdlib__List.assoc in file "list.ml", line 191, characters 10-25
    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 262, characters 30-49
-   Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
-   Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
-   Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 71, characters 1-35
+   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
+   Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 76, characters 2-23
    Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}];;
 
 
 let%expect_test "tuple 2" =
- inf_pprint_etyp [] (Exp_tuple (Exp_constant (Const_integer 1), Exp_constant (Const_integer 2), []));
- [%expect {| (int * int) |}];;
+  infer_exp_str {| (1, 2) |};
+  [%expect{| (int * int) |}]
 
 
 let%expect_test "tuple 3" =
- inf_pprint_etyp [] (Exp_tuple (Exp_constant (Const_integer 1), Exp_constant (Const_integer 2), [Exp_constant (Const_integer 3)]));
- [%expect {| (int * int * int) |}];;
+  infer_exp_str {| (1, 2, 3) |};
+  [%expect{| (int * int * int) |}]
 
 
-let%expect_test "tuple 4" =
- inf_pprint_etyp [] (Exp_tuple (Exp_constant (Const_integer 1), Exp_constant (Const_integer 2), [Exp_constant (Const_integer 3); Exp_constant(Const_integer 4)])) ;
- [%expect {| (int * int * int * int) |}];;
+  let%expect_test "tuple 4" =
+  infer_exp_str {| (1, 2, 3, 4) |};
+  [%expect{| (int * int * int * int) |}]
 
 
 let%expect_test "tuples in tuple" =
- inf_pprint_etyp []
- (Exp_tuple(
-  Exp_tuple (Exp_constant (Const_integer 1), Exp_constant (Const_integer 2), []),
-  Exp_tuple (Exp_constant (Const_integer 3), Exp_constant (Const_integer 4), []), []));
- [%expect {| ((int * int) * (int * int)) |}];;
+  infer_exp_str {| ((1, 2), (3, 4)) |};
+  [%expect{| ((int * int) * (int * int)) |}]
 
 
  let%expect_test "construct none" =
- let env = ["None", Type_construct ("option", [ Quant_type_var "a" ])]  in
- inf_pprint_etyp env (Exp_construct ("None", None));
+ let env = ["None", Type_construct ("option", [ Quant_type_var "a" ])] in
+  infer_exp_str {| None |} ~env: env;
  [%expect {| 'a option |}]
 
 
- let%expect_test "construct some" =
+let%expect_test "construct some" =
  let env = ["Some", Type_arrow (Type_var {contents = Unbound "a" }, Type_construct("option", [Quant_type_var "a"]))] in
- inf_pprint_etyp env (Exp_construct ("Some", Some (Exp_constant (Const_integer 1))));
+  infer_exp_str {| Some 1 |} ~env: env;
  [%expect {| 'a option |}]
 
 
 let%expect_test "if (string) " =
-  inf_pprint_etyp [] (Exp_if (Exp_constant (Const_string "trololo"), Exp_constant (Const_integer 1), None))
-[@@expect.uncaught_exn {|
+  infer_exp_str {| if "trololo" then 1 |};
+  [@@expect.uncaught_exn {|
   (* CR expect_test_collector: This test expectation appears to contain a backtrace.
      This is strongly discouraged as backtraces are fragile.
      Please change this test to not include a backtrace. *)
@@ -121,15 +111,13 @@ let%expect_test "if (string) " =
   (Failure "can't unify different constructors: string and bool")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
   Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 298, characters 4-43
-  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
-  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 123, characters 2-107
+  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
 let%expect_test "if (bool) then (not unit)" =
   let env = ["cond", type_bool] in
-  inf_pprint_etyp env (Exp_if ((Exp_ident "cond"), Exp_constant (Const_integer 1), None));
+  infer_exp_str {| if cond then 1 |} ~env: env;
   [%expect.unreachable]
 [@@expect.uncaught_exn {|
   (* CR expect_test_collector: This test expectation appears to contain a backtrace.
@@ -139,39 +127,38 @@ let%expect_test "if (bool) then (not unit)" =
   (Failure "can't unify different constructors: int and unit")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
   Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 302, characters 7-46
-  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
-  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 140, characters 2-89
+  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 142, characters 2-46
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
 let%expect_test "if (bool) then (unit)" =
   let env = ["cond", type_bool; "bodyvar", type_unit] in
-  inf_pprint_etyp env (Exp_if ((Exp_ident "cond"), Exp_ident "bodyvar", None));
+  infer_exp_str {| if cond then bodyvar |} ~env: env;
   [%expect{| unit |}]
 
 
 let%expect_test "if (bool) then 'a else 'a" =
   let env = ["cond", type_bool; "x", Type_var {contents = Unbound "a"}; "y", Type_var {contents = Unbound "a"}] in
-  inf_pprint_etyp env (Exp_if ((Exp_ident "cond"), Exp_ident "x", (Some (Exp_ident "y"))));
+  infer_exp_str  {| if cond then x else y |}  ~env: env;
   [%expect{| 'a |}]
 
 
 let%expect_test "if (bool) then 'a else 'b" =
   let env = ["cond", type_bool; "x", Type_var {contents = Unbound "a"}; "y", Type_var {contents = Unbound "b"}] in
-  inf_pprint_etyp env (Exp_if ((Exp_ident "cond"), Exp_ident "x", (Some (Exp_ident "y"))));
+  infer_exp_str  {| if cond then x else y |}  ~env: env;
   [%expect{| 'b |}]
 
 
 let%expect_test "apply int -> int to int" =
   let env = ["f", Type_arrow (type_int, type_int); "x", type_int] in
-  inf_pprint_etyp env (Exp_apply (Exp_ident "f", Exp_ident "x") );
+  infer_exp_str  {| f x |} ~env: env;
   [%expect{| int |}]
   
 
 let%expect_test "apply int -> int to string" =
   let env = ["f", Type_arrow (type_int, type_int); "x", type_string] in
-  inf_pprint_etyp env (Exp_apply (Exp_ident "f", Exp_ident "x") );
+  infer_exp_str {| f x |} ~env: env;
   [%expect.unreachable]
   [@@expect.uncaught_exn {|
     (* CR expect_test_collector: This test expectation appears to contain a backtrace.
@@ -182,28 +169,27 @@ let%expect_test "apply int -> int to string" =
     Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
     Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 131, characters 4-15
     Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 280, characters 4-47
-    Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
-    Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
-    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 182, characters 2-65
+    Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
+    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 184, characters 2-35
     Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
 let%expect_test "apply 'a -> 'a to 'b" =
   let env = ["f", Type_arrow (Type_var {contents = Unbound "s"}, Type_var {contents = Unbound "s"}); "x", Type_var {contents = Unbound "t"}] in
-  inf_pprint_etyp env (Exp_apply (Exp_ident "f", Exp_ident "x") ) ~rst:false;
+  infer_exp_str {| f x |} ~env: env ~rst: false;
   [%expect{| 'b |}]
 
 
   (* not sure if this is right *)
 let%expect_test "apply 'a to 'a (different vars)" =
   let env = ["f", Type_var {contents = Unbound "t"}; "x", Type_var {contents = Unbound "t"}] in
-  inf_pprint_etyp env (Exp_apply (Exp_ident "f", Exp_ident "x") ) ~rst:false;
+  infer_exp_str {| f x |} ~env: env ~rst: false;
   [%expect {| 'c |}]
 
 
 let%expect_test "apply 'a to 'a (same var)" =
   let env = ["x", Type_var {contents = Unbound "t"}] in
-  inf_pprint_etyp env (Exp_apply (Exp_ident "x", Exp_ident "x") ) ~rst:false;
+  infer_exp_str {| x x |} ~env: env ~rst: false;
   [%expect.unreachable]
 [@@expect.uncaught_exn {|
   (* CR expect_test_collector: This test expectation appears to contain a backtrace.
@@ -215,100 +201,98 @@ let%expect_test "apply 'a to 'a (same var)" =
   Called from Middleend__InferLayers.occurs_check in file "lib/middleend/inferLayers.ml", line 114, characters 4-22
   Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 128, characters 4-22
   Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 280, characters 4-47
-  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
-  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 214, characters 2-76
+  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 216, characters 2-47
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
 let%expect_test "apply 'a to 'b" =
   let env = ["f", Type_var {contents = Unbound "s"}; "x", Type_var {contents = Unbound "t"}] in
-  inf_pprint_etyp env (Exp_apply (Exp_ident "f", Exp_ident "x") ) ~rst:false;
+  infer_exp_str {| f x |} ~env: env ~rst: false;
   [%expect{| 'e |}]
 
 
 (************************** Patterns **************************)
 
- let%expect_test "id in env" =
- let env = ["m", (Type_var {contents = Unbound "c"})] in
- inf_pprint_ptyp env (Pat_var "m");
- [%expect {| 'a |}];;
+let%expect_test "id in env" =
+  let env = ["m", (Type_var {contents = Unbound "c"})] in
+  infer_pat_str {| m |} ~env: env;
+  [%expect {| 'a |}];;
 
 
-  let%expect_test "id not in env" =
- inf_pprint_ptyp [] (Pat_var "m");
- [%expect {| 'a |}];;
+let%expect_test "id not in env" =
+  infer_pat_str {| m |};
+  [%expect {| 'a |}];;
 
 
-   let%expect_test "any" =
- inf_pprint_ptyp [] (Pat_any);
- [%expect {| 'a |}];;
+let%expect_test "any" =
+  infer_pat_str {| _ |};
+  [%expect {| 'a |}];;
 
 
 let%expect_test "char" =
- inf_pprint_ptyp [] (Pat_constant (Const_char 'a'));
- [%expect {| char |}];;
+  infer_pat_str {| 'a' |};
+  [%expect {| char |}];;
 
 
 let%expect_test "int" =
- inf_pprint_ptyp[] (Pat_constant (Const_integer 1));
- [%expect {| int |}];;
+  infer_pat_str {| 1 |};
+  [%expect {| int |}];;
 
 
 let%expect_test "str" =
- inf_pprint_ptyp [] (Pat_constant (Const_string "Kakadu"));
- [%expect {| string |}];;
+  infer_pat_str {| "kakadu" |};
+  [%expect {| string |}];;
 
 
 let%expect_test "tuple 2" =
- inf_pprint_ptyp [] (Pat_tuple (Pat_constant (Const_integer 1), Pat_constant (Const_integer 2), []));
- [%expect {| (int * int) |}];;
+  infer_pat_str {| (1, 2) |};
+  [%expect {| (int * int) |}];;
 
 
 let%expect_test "tuple 3" =
- inf_pprint_ptyp [] (Pat_tuple (Pat_constant (Const_integer 1), Pat_constant (Const_integer 2), [Pat_constant (Const_integer 3)]));
- [%expect {| (int * int * int) |}];;
+  infer_pat_str {| (1, 2, 3) |};
+  [%expect {| (int * int * int) |}];;
 
 
 let%expect_test "tuple 4" =
- inf_pprint_ptyp [] (Pat_tuple (Pat_constant (Const_integer 1), Pat_constant (Const_integer 2), [Pat_constant (Const_integer 3); Pat_constant(Const_integer 4)])) ;
- [%expect {| (int * int * int * int) |}];;
+  infer_pat_str {| (1, 2, 3, 4) |};
+   [%expect {| (int * int * int * int) |}];;
 
 
 let%expect_test "tuples in tuple" =
- inf_pprint_ptyp []
- (Pat_tuple(
-  Pat_tuple (Pat_constant (Const_integer 1), Pat_constant (Const_integer 2), []),
-  Pat_tuple (Pat_constant (Const_integer 3), Pat_constant (Const_integer 4), []), []));
- [%expect {| ((int * int) * (int * int)) |}];;
+  infer_pat_str {| ((1, 2), (3, 4)) |};
+   [%expect {| ((int * int) * (int * int)) |}];;
 
 
- let%expect_test "construct none" =
- let env = ["None", Type_construct ("option", [ Quant_type_var "a" ])]  in
- inf_pprint_ptyp env (Pat_construct ("None", None));
- [%expect {| 'a option |}]
+let%expect_test "construct none" =
+  let env = ["None", Type_construct ("option", [ Quant_type_var "a" ])]  in
+  infer_pat_str {| None |} ~env: env;
+  [%expect {| 'a option |}]
 
 
  let%expect_test "construct some" =
- let env = ["Some", Type_arrow (Type_var {contents = Unbound "a" }, Type_construct("option", [Quant_type_var "n"]))] in
- inf_pprint_ptyp env (Pat_construct ("Some", Some (Pat_constant (Const_integer 1))));
+ let env = ["Some", Type_arrow (Type_var {contents = Unbound "a" },
+            Type_construct("option", [Quant_type_var "n"]))] in
+  infer_pat_str {| Some 1 |} ~env: env;
  [%expect {| 'n option |}]
 
 
 (************************** Funs **************************)
 
 let%expect_test "fun 'a -> 'a (new var)" =
- inf_pprint_etyp [] (Exp_fun ((Pat_var "x", []), Exp_ident "x"));
+  infer_exp_str {| fun x -> x |};
   [%expect {| ('a -> 'a) |}]
 
 
 let%expect_test "fun 'a -> 'a (shadow)" =
- inf_pprint_etyp ["x", Type_var {contents = Unbound "type 's"}] (Exp_fun ((Pat_var "x", []), Exp_ident "x"));
+  let env = ["x", Type_var {contents = Unbound "type 's"}] in
+  infer_exp_str {| fun x -> x |} ~env: env;
   [%expect {| ('a -> 'a) |}]
 
 
 let%expect_test "fun 'a -> 'b (not in env)" =
- inf_pprint_etyp [] (Exp_fun ((Pat_var "x", []), Exp_ident "y"));
+  infer_exp_str {| fun x -> y |};
   [%expect.unreachable]
 [@@expect.uncaught_exn {|
   (* CR expect_test_collector: This test expectation appears to contain a backtrace.
@@ -319,36 +303,29 @@ let%expect_test "fun 'a -> 'b (not in env)" =
   Raised at Stdlib__List.assoc in file "list.ml", line 191, characters 10-25
   Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 262, characters 30-49
   Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 273, characters 14-35
-  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
-  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 319, characters 1-64
+  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 320, characters 2-31
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
 let%expect_test "fun 'a -> 'b (in env)" =
- inf_pprint_etyp ["y", Type_var {contents = Unbound "s"}] (Exp_fun ((Pat_var "x", []), Exp_ident "y"));
+  let env = ["y", Type_var {contents = Unbound "s"}] in
+  infer_exp_str {| fun x -> y |} ~env: env;
   [%expect{| ('a -> 's) |}]
 
 
-let%expect_test "fun x -> fun y -> x y;;" =
-  inf_pprint_etyp [] (Exp_fun((Pat_var "x", []), Exp_fun((Pat_var "y", []), Exp_apply(Exp_ident "x", Exp_ident "y"))));
+let%expect_test _=
+  infer_exp_str {| fun x -> fun y -> x y |};
+ [%expect{| (('b -> 'c) -> ('b -> 'c)) |}]
+
+
+let%expect_test _ =
+  infer_exp_str {| fun x y -> x y |};
   [%expect{| (('b -> 'c) -> ('b -> 'c)) |}]
 
 
-let%expect_test "fun x y -> x y;;" =
-  inf_pprint_etyp [] (Exp_fun((Pat_var "x", [Pat_var "y"]), Exp_apply(Exp_ident "x", Exp_ident "y")));
-  [%expect{| (('b -> 'c) -> ('b -> 'c)) |}]
-
-
-let%expect_test {| (fun f a b -> f a, f b) (fun x -> x) 1 "mystr" |} =
-  inf_pprint_etyp [] 
-  (Exp_apply
-    (Exp_apply(
-      (Exp_apply
-        (Exp_fun ((Pat_var "f", [Pat_var "a"; Pat_var "b"]), Exp_tuple (Exp_apply (Exp_ident "f", Exp_ident "a"), Exp_apply (Exp_ident "f", Exp_ident "b"), [])),
-        Exp_fun ((Pat_var "x", []), Exp_ident "x"))),
-       Exp_constant (Const_integer 1)),
-     Exp_constant (Const_string "mystr")));
+let%expect_test _ =
+  infer_exp_str {| (fun f a b -> f a, f b) (fun x -> x) 1 "mystr" |};
   [%expect.unreachable]
   [@@expect.uncaught_exn {|
     (* CR expect_test_collector: This test expectation appears to contain a backtrace.
@@ -359,57 +336,55 @@ let%expect_test {| (fun f a b -> f a, f b) (fun x -> x) 1 "mystr" |} =
     Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
     Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 131, characters 4-15
     Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 280, characters 4-47
-    Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
-    Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
-    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 352, characters 2-366
+    Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
+    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 354, characters 2-68
     Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
 (************************** Let in **************************)
 
-let%expect_test "let 1 = 1 in 2" =
-  inf_pprint_etyp [] (Exp_let (Nonrecursive, ({pat = Pat_constant (Const_integer 1); expr = Exp_constant (Const_integer 1)}, []), Exp_constant (Const_integer 2)));
+let%expect_test _ =
+  infer_exp_str {| let 1 = 1 in 2 |};
   [%expect{| int |}]
 
 
-let%expect_test "let _ = 1 in 2" =
-  inf_pprint_etyp [] (Exp_let (Nonrecursive, ({pat = Pat_any; expr = Exp_constant (Const_integer 1)}, []), Exp_constant (Const_integer 2)));
+let%expect_test _ =
+  infer_exp_str {| let a = 1 in 2 |};
   [%expect{| int |}]
 
 
-let%expect_test "let a = 1 in a" =
-  inf_pprint_etyp [] (Exp_let (Nonrecursive, ({pat = Pat_var "a"; expr = Exp_constant (Const_integer 1)}, []), Exp_ident "a"));
+let%expect_test _ =
+infer_exp_str {| let a = 1 in a |};
   [%expect{| int |}]
 
 
-let%expect_test {| let a = 1 in "str" |} =
-  inf_pprint_etyp [] (Exp_let (Nonrecursive, ({pat = Pat_var "a"; expr = Exp_constant (Const_integer 1)}, []), Exp_constant (Const_string "str")));
+let%expect_test _ =
+  infer_exp_str {| let a = 1 in a |};
+  [%expect{| int |}]
+
+
+let%expect_test _ =
+  infer_exp_str {| let a = 1 in "str" |};
   [%expect{| string |}]
 
 
-let%expect_test {| let a = fun x -> x in a |} =
-  inf_pprint_etyp [] (Exp_let (Nonrecursive,
-  ({pat = Pat_var "a"; expr = Exp_fun ((Pat_var "x", []), Exp_ident "x")}, []), Exp_ident "a"));
+let%expect_test _ =
+  infer_exp_str {| let a = fun x -> x in a |};
   [%expect{| ('c -> 'c) |}]
 
 
-let%expect_test {| let a = fun x -> x in (a 1, a "str") |} =
-  inf_pprint_etyp [] (Exp_let (Nonrecursive,
-  ({pat = Pat_var "a"; expr = Exp_fun ((Pat_var "x", []), Exp_ident "x")}, []),
-  Exp_tuple(Exp_apply(Exp_ident "a", Exp_constant (Const_integer 1)),
-            Exp_apply (Exp_ident "a", Exp_constant (Const_string "str")), [])));
+let%expect_test _ =
+  infer_exp_str {| let a = fun x -> x in (a 1, a "str") |};
   [%expect{| (int * string) |}]
 
 
-let%expect_test {| let a, b = 1, 2 in a |} =
-  inf_pprint_etyp [] (Exp_let (Nonrecursive,
-  ({pat = Pat_tuple (Pat_var "a", Pat_var "b", []); expr = Exp_tuple (Exp_constant (Const_integer 1), Exp_constant (Const_integer 2), [])}, []), Exp_ident "a"));
+let%expect_test _ =
+  infer_exp_str  {| let a, b = 1, 2 in a |} ;
   [%expect{| int |}]
 
 
-let%expect_test {| let a, b, c = 1, 2 in a |} =
-  inf_pprint_etyp [] (Exp_let (Nonrecursive,
-  ({pat = Pat_tuple (Pat_var "a", Pat_var "b", [Pat_var "c"]); expr = Exp_tuple (Exp_constant (Const_integer 1), Exp_constant (Const_integer 2), [])}, []), Exp_ident "a"));
+let%expect_test _ =
+  infer_exp_str  {| let a, b, c = 1, 2 in a |} ;
   [%expect.unreachable]
 [@@expect.uncaught_exn {|
   (* CR expect_test_collector: This test expectation appears to contain a backtrace.
@@ -422,15 +397,13 @@ let%expect_test {| let a, b, c = 1, 2 in a |} =
   Called from Middleend__InferLayers.infer_vb in file "lib/middleend/inferLayers.ml", line 258, characters 2-32
   Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
   Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 309, characters 18-84
-  Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
-  Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 420, characters 2-216
+  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 415, characters 2-46
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
-  let%expect_test {| let a, b = 1, 2, 3 in a |} =
-  inf_pprint_etyp [] (Exp_let (Nonrecursive,
-  ({pat = Pat_tuple (Pat_var "a", Pat_var "b", []); expr = Exp_tuple (Exp_constant (Const_integer 1), Exp_constant (Const_integer 2), [Exp_constant (Const_integer 3)])}, []), Exp_ident "a"));
+let%expect_test _ =
+  infer_exp_str {| let a, b = 1, 2, 3 in a |};
   [%expect.unreachable]
   [@@expect.uncaught_exn {|
     (* CR expect_test_collector: This test expectation appears to contain a backtrace.
@@ -443,17 +416,15 @@ let%expect_test {| let a, b, c = 1, 2 in a |} =
     Called from Middleend__InferLayers.infer_vb in file "lib/middleend/inferLayers.ml", line 258, characters 2-32
     Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
     Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 309, characters 18-84
-    Called from XML_unittests__Infer.inf_pprint_etyp_env in file "many_tests/unit/infer.ml", line 22, characters 21-38
-    Called from XML_unittests__Infer.inf_pprint_etyp in file "many_tests/unit/infer.ml" (inlined), line 33, characters 44-76
-    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 440, characters 2-235
+    Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
+    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 434, characters 2-45
     Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
-let%expect_test {| let a = 1 and b = "punk" in b |} =
-  inf_pprint_etyp [] (Exp_let (Nonrecursive,
-  ({pat = Pat_var "a"; expr = Exp_constant (Const_integer 1)},
-  [{pat = Pat_var "b"; expr = Exp_constant (Const_string "punk")}]), Exp_ident "b"));
+let%expect_test _ =
+  infer_exp_str  {| let a = 1 and b = "punk" in b |};
   [%expect{| string |}]
+
 
 (************************** Structure items **************************)
 

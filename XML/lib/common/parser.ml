@@ -619,5 +619,13 @@ let pstructure =
   sep_by psemicolon pstr_item <* psemicolon <* pass_ws
 ;;
 
+let parse_exp_str str =
+  parse_string ~consume:All (pass_ws *> pexpr <* pass_ws) str |> Result.ok_or_failwith
+;;
+
+let parse_pat_str str =
+  parse_string ~consume:All (pass_ws *> ppattern <* pass_ws) str |> Result.ok_or_failwith
+;;
+
 let parse str = parse_string ~consume:All pstructure str
 let parse_str str = parse str |> Result.ok_or_failwith
