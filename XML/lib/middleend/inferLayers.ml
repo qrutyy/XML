@@ -107,6 +107,25 @@ and pprint_type_with_parens_if_tuple
   | _ -> (pprint_typ ~poly_names_map) fmt ty
 ;;
 
+let show_env env =
+  let buf = Buffer.create 64 in
+  let fmt = Format.formatter_of_buffer buf in
+  let empty_map = Base.Map.empty (module Base.String) in
+  let rec loop = function
+    | [] -> ()
+    | [ (name, typ) ] ->
+      Format.fprintf fmt "(%s, %a)" name (pprint_typ ~poly_names_map:empty_map) typ
+    | (name, typ) :: rest ->
+      Format.fprintf fmt "(%s, %a) :: " name (pprint_typ ~poly_names_map:empty_map) typ;
+      loop rest
+  in
+  Format.fprintf fmt "[";
+  loop env;
+  Format.fprintf fmt "]";
+  Format.pp_print_flush fmt ();
+  Buffer.contents buf
+;;
+
 let rec occurs_check tv = function
   | Type_var tv' when tv == tv' -> failwith "occurs check"
   | Type_var { contents = Link t } -> occurs_check tv t
@@ -268,6 +287,16 @@ let add_rec_names env vb_list =
     vb_list
 ;;
 
+let rec get_pat_names acc pat =
+  match pat with
+  | Pat_var id -> id :: acc
+  | Pat_tuple (pat1, pat2, rest) ->
+    Base.List.fold_left ~f:get_pat_names ~init:acc (pat1 :: pat2 :: rest)
+  | Pat_construct ("Some", Some pat) -> get_pat_names acc pat
+  | Pat_constraint (pat, _) -> get_pat_names acc pat
+  | _ -> acc
+;;
+
 let rec infer_vb env { pat; expr } =
   let new_env, typ_p = infer_pat env pat in
   let new_env1, typ_e = infer_exp new_env expr in
@@ -364,12 +393,47 @@ and infer_exp env = function
       List.fold_left (fun env bind -> infer_vb_rec env bind) new_env (vb :: vbs)
     in
     infer_exp new_env1 exprb
-  (* | Exp_constraint (exp, ty) ->
-    let new_env, new_ty = infer_exp env exp in
-    unify ty new_ty;
-    new_env new_ty *)
-  (* |Exp_match _ |Exp_function _ -> *)
-  | _ -> failwith "infer exp not implemented"
+  | Exp_match (expr, (case, rest)) ->
+    let new_env, typ_main = infer_exp env expr in
+    let fresh = newvar () in
+    let typ_res =
+      List.fold_left
+        (fun acc_typ curr_case ->
+           let pat_names = get_pat_names [] curr_case.first in
+           let pat_env, typ_pat = infer_pat new_env curr_case.first in
+           unify typ_pat typ_main;
+           let pat_env =
+             List.fold_left
+               (fun env name ->
+                  let typ = List.assoc name env in
+                  let env = List.remove_assoc name env in
+                  (name, generalize typ) :: env)
+               pat_env
+               pat_names
+           in
+           let _, typ_exp = infer_exp pat_env curr_case.second in
+           unify acc_typ typ_exp;
+           acc_typ)
+        fresh
+        (case :: rest)
+    in
+    new_env, typ_res
+  | Exp_function (case, rest) ->
+    let fresh_p = newvar () in
+    let fresh_e = newvar () in
+    let typ_res =
+      List.fold_left
+        (fun acc_typ curr_case ->
+           let env_pat, typ_pat = infer_pat env curr_case.first in
+           unify typ_pat fresh_p;
+           let _, typ_exp = infer_exp env_pat curr_case.second in
+           unify acc_typ typ_exp;
+           acc_typ)
+        fresh_e
+        (case :: rest)
+    in
+    env, Type_arrow (fresh_p, typ_res)
+  | Exp_constraint _ -> failwith " exp constraint is not implemented yet"
 ;;
 
 (* нужно реализовать матчи, фанкшены, леты. затем протестить,
