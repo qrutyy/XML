@@ -4,6 +4,7 @@
 
 open Common.Ast
 open Common.Ast.Expression
+open Common.Ast.Structure
 open Common.Ast.Pattern
 
 type typ =
@@ -18,6 +19,11 @@ and tv =
   | Unbound of ident
   | Link of typ
 [@@deriving eq, show { with_path = false }]
+
+let rec follow_links = function
+  | Type_var { contents = Link t } -> follow_links t
+  | t -> t
+;;
 
 let rec pprint_type_tuple ?(poly_names_map = Base.Map.empty (module Base.String)) fmt =
   let open Format in
@@ -300,8 +306,18 @@ let rec get_pat_names acc pat =
 let rec infer_vb env { pat; expr } =
   let new_env, typ_p = infer_pat env pat in
   let new_env1, typ_e = infer_exp new_env expr in
-  unify typ_p (generalize typ_e);
-  new_env1
+  unify typ_p typ_e;
+  let pat_names = get_pat_names [] pat in
+  let new_env2 =
+    List.fold_left
+      (fun env name ->
+         let typ = List.assoc name env in
+         let env = List.remove_assoc name env in
+         (name, generalize typ) :: env)
+      new_env1
+      pat_names
+  in
+  new_env2
 
 and infer_vb_rec env { pat; expr } =
   match pat with
@@ -311,8 +327,17 @@ and infer_vb_rec env { pat; expr } =
     let new_env1, typ_e = infer_exp new_env expr in
     (* unify typ_p (generalize typ_e); *)
     unify typ_p typ_e;
-    unify typ_p (generalize typ_e);
-    new_env1
+    let pat_names = get_pat_names [] pat in
+    let new_env2 =
+      List.fold_left
+        (fun env name ->
+           let typ = List.assoc name env in
+           let env = List.remove_assoc name env in
+           (name, generalize typ) :: env)
+        new_env1
+        pat_names
+    in
+    new_env2
   | _ -> failwith "only variables are allowed as left-hand side of 'let rec'"
 
 and infer_exp env = function
@@ -340,7 +365,7 @@ and infer_exp env = function
        let new_env1, typ2 = infer_exp new_env exp2 in
        let arg_typ, res_typ =
          match List.assoc_opt op env with
-         | Some (Type_arrow (arg, Type_arrow (_, res))) -> arg, res
+         | Some (Type_arrow (arg, Type_arrow (_, res))) -> inst arg, inst res
          | _ -> failwith ("operator was not found in env: " ^ op)
        in
        unify typ1 arg_typ;
@@ -436,5 +461,63 @@ and infer_exp env = function
   | Exp_constraint _ -> failwith " exp constraint is not implemented yet"
 ;;
 
-(* нужно реализовать матчи, фанкшены, леты. затем протестить,
-что все работает, как надо, затем добавлять левела *)
+let infer_structure_item env = function
+  | Str_eval exp ->
+    let _, typ = infer_exp env exp in
+    ("-", typ) :: env
+  | Str_value (Nonrecursive, (vb, vbs)) ->
+    let new_env = List.fold_left (fun env bind -> infer_vb env bind) env (vb :: vbs) in
+    new_env
+  | Str_value (Recursive, (vb, vbs)) ->
+    let new_env = add_rec_names env (vb :: vbs) in
+    let new_env1 =
+      List.fold_left (fun env bind -> infer_vb_rec env bind) new_env (vb :: vbs)
+    in
+    new_env1
+  | Str_adt _ -> failwith "str_adt will be removed"
+;;
+
+let infer_program env prog =
+  let new_env =
+    List.fold_left (fun env str_item -> infer_structure_item env str_item) env prog
+  in
+  new_env
+;;
+
+let env_with_things =
+  let type_bool = Type_construct ("bool", []) in
+  let type_unit = Type_construct ("unit", []) in
+  let type_int = Type_construct ("int", []) in
+  let things_list =
+    [ "||", Type_arrow (type_bool, Type_arrow (type_bool, type_bool))
+    ; "&&", Type_arrow (type_bool, Type_arrow (type_bool, type_bool))
+    ; "print_int", Type_arrow (type_int, type_unit)
+    ; "print_gc_status", Type_arrow (type_unit, type_unit)
+    ; "collect", Type_arrow (type_unit, type_unit)
+    ; "+", Type_arrow (type_int, Type_arrow (type_int, type_int))
+    ; "-", Type_arrow (type_int, Type_arrow (type_int, type_int))
+    ; "*", Type_arrow (type_int, Type_arrow (type_int, type_int))
+    ; "/", Type_arrow (type_int, Type_arrow (type_int, type_int))
+    ; "=", Type_arrow (Quant_type_var "a", Type_arrow (Quant_type_var "a", type_bool))
+    ; "<>", Type_arrow (Quant_type_var "a", Type_arrow (Quant_type_var "a", type_bool))
+    ; "<", Type_arrow (Quant_type_var "a", Type_arrow (Quant_type_var "a", type_bool))
+    ; "<=", Type_arrow (Quant_type_var "a", Type_arrow (Quant_type_var "a", type_bool))
+    ; ">", Type_arrow (Quant_type_var "a", Type_arrow (Quant_type_var "a", type_bool))
+    ; ">=", Type_arrow (Quant_type_var "a", Type_arrow (Quant_type_var "a", type_bool))
+    ; "None", Type_construct ("option", [ Quant_type_var "a" ])
+    ; ( "Some"
+      , Type_arrow (Quant_type_var "a", Type_construct ("option", [ Quant_type_var "a" ]))
+      )
+    ; "true", type_bool
+    ; "false", type_bool
+    ; "()", type_unit
+    ; "[]", Type_construct ("list", [ Quant_type_var "a" ])
+    ; ( "::"
+      , Type_arrow
+          ( Type_tuple
+              (Quant_type_var "a", Type_construct ("list", [ Quant_type_var "a" ]), [])
+          , Type_construct ("list", [ Quant_type_var "a" ]) ) )
+    ]
+  in
+  things_list
+;;

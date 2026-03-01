@@ -25,6 +25,32 @@ val pprint_typ
   -> typ
   -> unit
 
+(** resets counter for type variables *)
 val reset_gensym : unit -> unit
+
+(** [infer_exp env exp] infers type of the expression [exp] in the environment [env] and returns
+  updated environment and type of [exp] *)
 val infer_exp : (ident * typ) list -> Expression.t -> (ident * typ) list * typ
+
+(** [infer_pat env pat] infers type of the pattern [pat] in the environment [env] and returns
+  updated environment and type of [pat] *)
 val infer_pat : (ident * typ) list -> Pattern.t -> (ident * typ) list * typ
+
+(** [infer_structure_item env item] infers type of the item [item] in the environment [env] and returns
+  updated environment and type of [item] *)
+val infer_structure_item
+  :  (ident * typ) list
+  -> Structure.structure_item
+  -> (ident * typ) list
+
+(** [infer_program env prog] infers all types in program [prog] with initial environment [env] and returns
+  updated environment
+
+  for basic environment, use [env_with_things] *)
+val infer_program
+  :  (ident * typ) list
+  -> Structure.structure_item list
+  -> (ident * typ) list
+
+(** [env_with_things] is the basic environment that contains built-in functions and constructors *)
+val env_with_things : (ident * typ) list
