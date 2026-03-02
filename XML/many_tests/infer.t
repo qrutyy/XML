@@ -27,7 +27,7 @@
   val main : int
 
   $ dune exec -- ../bin/XML_llvm.exe -fromfile manytests/typed/006partial2.ml -typedtree
-  val foo : int
+  val foo : int -> int -> int -> int
   val main : int
 
   $ dune exec -- ../bin/XML_llvm.exe -fromfile manytests/typed/006partial3.ml -typedtree
@@ -39,19 +39,8 @@
   val main : unit
 
   $ dune exec -- ../bin/XML_llvm.exe -fromfile manytests/typed/008ascription.ml -typedtree
-  Fatal error: exception Failure(" exp constraint is not implemented yet")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 455, characters 14-35
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 454, characters 20-63
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 454, characters 20-63
-  Called from Middleend__InferLayers.infer_vb in file "lib/middleend/inferLayers.ml", line 399, characters 20-38
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__InferLayers.infer_structure_item in file "lib/middleend/inferLayers.ml", line 573, characters 18-84
-  Called from Middleend__InferLayers.infer_program.(fun) in file "lib/middleend/inferLayers.ml", line 591, characters 34-67
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__InferLayers.infer_program in file "lib/middleend/inferLayers.ml", line 589, characters 4-189
-  Called from Dune__exe__XML_llvm.compile_and_write in file "bin/XML_llvm.ml", line 51, characters 7-40
-  [2]
+  val addi : ('a -> bool -> int) -> ('a -> bool) -> 'a -> int
+  val main : int
 
   $ dune exec -- ../bin/XML_llvm.exe -fromfile manytests/typed/009let_poly.ml -typedtree
   val temp : int * bool

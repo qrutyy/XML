@@ -48,12 +48,24 @@ module Constant : sig
 end
 
 module TypeExpr : sig
-  type t =
+  (*
+     type t =
     | Type_arrow of t * t (** Represents a function type: [T1 -> T2]. *)
     | Type_var of ident (** Represents a type variable: ['a]. *)
     | Type_tuple of t List2.t (** Represents a tuple type: [(T1, T2, ..., Tn)]. *)
     | Type_construct of ident * t list
     (** Represents a type constructor with arguments: [C T1 ... Tn]. *)
+  *)
+  type t =
+    | Type_arrow of t * t
+    | Type_tuple of t List2.t
+    | Type_var of tv ref
+    | Quant_type_var of ident
+    | Type_construct of ident * t list
+
+  and tv =
+    | Unbound of ident
+    | Link of t
 
   val equal : t -> t -> bool
   val pp : Format.formatter -> t -> unit

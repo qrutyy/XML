@@ -95,7 +95,7 @@ module Constant = struct
 end
 
 module TypeExpr = struct
-  type t =
+  (* type t =
     | Type_arrow of t * t
     (** [Type_arrow(T1, T2)] represents:
                               [T1 -> T2] *)
@@ -105,7 +105,24 @@ module TypeExpr = struct
     (** [Type_construct(lident, l)] represents:
         - [tconstr]               when [l=[]],
         - [T tconstr]             when [l=[T]],
-        - [(T1, ..., Tn) tconstr] when [l=[T1 ; ... ; Tn]]. *)
+        - [(T1, ..., Tn) tconstr] when [l=[T1 ; ... ; Tn]]. *) *)
+
+  let gen_ref inner_gen =
+    let open QCheck.Gen in
+    map (fun x -> ref x) inner_gen
+  ;;
+
+  type t =
+    | Type_arrow of t * t
+    | Type_tuple of t List2.t
+    | Type_var of tv ref
+    | Quant_type_var of ident
+    | Type_construct of ident * t list
+  [@@deriving eq, show { with_path = false }, qcheck]
+
+  and tv =
+    | Unbound of ident
+    | Link of t
   [@@deriving eq, show { with_path = false }, qcheck]
 end
 
