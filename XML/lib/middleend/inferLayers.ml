@@ -25,6 +25,56 @@ let rec follow_links = function
   | t -> t
 ;;
 
+let rearr_typvars typ =
+  let open Base in
+  let var_counter = ref 0 in
+  let rec rename (t : typ) (var_map : (string, string, String.comparator_witness) Map.t)
+    : typ * (string, string, String.comparator_witness) Map.t
+    =
+    match t with
+    | Type_arrow (t1, t2) ->
+      let t1', map1 = rename t1 var_map in
+      let t2', map2 = rename t2 map1 in
+      Type_arrow (t1', t2'), map2
+    | Type_tuple (t1, t2, tl) ->
+      let t1', map1 = rename t1 var_map in
+      let t2', map2 = rename t2 map1 in
+      let ts = tl in
+      List.fold_left ts ~init:([], map2) ~f:(fun (acc_ts, acc_map) t_elem ->
+        let t_elem', new_map = rename t_elem acc_map in
+        t_elem' :: acc_ts, new_map)
+      |> fun (rev_ts, final_map) -> Type_tuple (t1', t2', List.rev rev_ts), final_map
+    | Type_var tv_ref ->
+      (match !tv_ref with
+       | Unbound _ -> Type_var tv_ref, var_map
+       | Link linked_t -> rename linked_t var_map)
+    | Quant_type_var id ->
+      (match Map.find var_map id with
+       | Some new_id -> Quant_type_var new_id, var_map
+       | None ->
+         let idx = !var_counter in
+         var_counter := idx + 1;
+         let new_id =
+           if idx < 26
+           then String.make 1 (Char.of_int_exn (97 + idx))
+           else (
+             let prefix_count = (idx / 26) - 1 in
+             let suffix_idx = idx mod 26 in
+             "'"
+             ^ String.make (prefix_count + 1) (Char.of_int_exn (97 + (idx / 26) - 1))
+             ^ String.make 1 (Char.of_int_exn (97 + suffix_idx)))
+         in
+         let new_map = Map.set var_map ~key:id ~data:new_id in
+         Quant_type_var new_id, new_map)
+    | Type_construct (id, args) ->
+      List.fold_left args ~init:([], var_map) ~f:(fun (acc_args, acc_map) arg ->
+        let arg', new_map = rename arg acc_map in
+        arg' :: acc_args, new_map)
+      |> fun (rev_args, final_map) -> Type_construct (id, List.rev rev_args), final_map
+  in
+  fst (rename typ (Map.empty (module String)))
+;;
+
 let rec pprint_type_tuple ?(poly_names_map = Base.Map.empty (module Base.String)) fmt =
   let open Format in
   function
@@ -72,25 +122,40 @@ and pprint_type_list_with_parens
   in
   print_types fmt ty_list
 
-and pprint_typ fmt ?(poly_names_map = Base.Map.empty (module Base.String)) =
+and pprint_typ fmt ?(poly_names_map = Base.Map.empty (module Base.String)) typ =
+  let rec is_arrow = function
+    | Type_arrow _ -> true
+    | Type_var { contents = Link t } -> is_arrow t
+    | _ -> false
+  in
+  let rec is_tuple = function
+    | Type_tuple _ -> true
+    | Type_var { contents = Link t } -> is_tuple t
+    | _ -> false
+  in
   let open Format in
-  function
-  | Type_arrow (t1, t2) ->
+  match typ with
+  | Type_arrow (t1, t2) when is_arrow t1 ->
     fprintf
       fmt
-      "(%a -> %a)"
+      "(%a) -> %a"
       (pprint_typ ~poly_names_map)
       t1
       (pprint_typ ~poly_names_map)
       t2
+  | Type_arrow (t1, t2) ->
+    fprintf fmt "%a -> %a" (pprint_typ ~poly_names_map) t1 (pprint_typ ~poly_names_map) t2
   | Type_tuple (t1, t2, tl) ->
     fprintf
       fmt
-      "(%s)"
+      "%s"
       (String.concat
          " * "
          (List.map
-            (fun t -> asprintf "%a" (pprint_typ ~poly_names_map) t)
+            (fun t ->
+               if is_tuple t
+               then asprintf "(%a)" (pprint_typ ~poly_names_map) t
+               else asprintf "%a" (pprint_typ ~poly_names_map) t)
             (t1 :: t2 :: tl)))
   | Type_var { contents = Unbound id } ->
     (match Base.Map.find poly_names_map id with
@@ -113,23 +178,41 @@ and pprint_type_with_parens_if_tuple
   | _ -> (pprint_typ ~poly_names_map) fmt ty
 ;;
 
-let show_env env =
-  let buf = Buffer.create 64 in
-  let fmt = Format.formatter_of_buffer buf in
-  let empty_map = Base.Map.empty (module Base.String) in
-  let rec loop = function
-    | [] -> ()
-    | [ (name, typ) ] ->
-      Format.fprintf fmt "(%s, %a)" name (pprint_typ ~poly_names_map:empty_map) typ
-    | (name, typ) :: rest ->
-      Format.fprintf fmt "(%s, %a) :: " name (pprint_typ ~poly_names_map:empty_map) typ;
-      loop rest
-  in
-  Format.fprintf fmt "[";
-  loop env;
-  Format.fprintf fmt "]";
-  Format.pp_print_flush fmt ();
-  Buffer.contents buf
+let filter_env (env : (ident * typ) list) (names : ident list) =
+  List.fold_left
+    (fun acc name ->
+       match List.assoc_opt name env, List.assoc_opt name acc with
+       | Some ty, None -> (name, ty) :: acc
+       | _ -> acc)
+    []
+    names
+;;
+
+let pprint_env env names =
+  let open Format in
+  let new_env = filter_env env names in
+  List.iter
+    (fun (key, typ) ->
+       if
+         String.length key > 0
+         && Stdlib.Char.code key.[0] >= 65
+         && Stdlib.Char.code key.[0] <= 90
+       then ()
+       else if key = "-"
+       then
+         printf
+           "%s : %a\n"
+           key
+           (pprint_typ ~poly_names_map:(Base.Map.empty (module Base.String)))
+           typ
+       else (
+         let typ = rearr_typvars typ in
+         printf
+           "val %s : %a\n"
+           key
+           (pprint_typ ~poly_names_map:(Base.Map.empty (module Base.String)))
+           typ))
+    new_env
 ;;
 
 let rec occurs_check tv = function
@@ -165,7 +248,15 @@ let rec unify t1 t2 =
     else List.map2 unify llst rlst |> ignore
   | Quant_type_var _, _ | _, Quant_type_var _ ->
     failwith "cannot unify with a quantified type"
-  | _ -> failwith ("cannot unify types: " ^ show_typ t1 ^ "and: " ^ show_typ t2)
+  (* | _ -> failwith ("cannot unify types: " ^ show_typ t1 ^ "and: " ^ show_typ t2) *)
+  | _ ->
+    failwith
+      (Format.asprintf
+         "cannot unify types: %a and %a"
+         (fun fmt -> pprint_typ fmt ~poly_names_map:(Base.Map.empty (module Base.String)))
+         t1
+         (fun fmt -> pprint_typ fmt ~poly_names_map:(Base.Map.empty (module Base.String)))
+         t2)
 ;;
 
 (* | _ -> failwith "error" *)
@@ -264,7 +355,7 @@ let rec infer_pat env = function
   | Pat_construct (name, pat) ->
     let ty = List.assoc name env in
     let inst_ty = inst ty in
-    (match ty, pat with
+    (match inst_ty, pat with
      | Type_arrow (arg, body), Some p ->
        let new_env, new_ty = infer_pat env p in
        unify arg new_ty;
@@ -304,27 +395,33 @@ let rec get_pat_names acc pat =
 ;;
 
 let rec infer_vb env { pat; expr } =
+  (* we don't need local names *)
+  let _, typ_e = infer_exp env expr in
   let new_env, typ_p = infer_pat env pat in
-  let new_env1, typ_e = infer_exp new_env expr in
   unify typ_p typ_e;
   let pat_names = get_pat_names [] pat in
-  let new_env2 =
+  let new_env1 =
     List.fold_left
       (fun env name ->
          let typ = List.assoc name env in
          let env = List.remove_assoc name env in
          (name, generalize typ) :: env)
-      new_env1
+      new_env
       pat_names
   in
-  new_env2
+  new_env1
 
 and infer_vb_rec env { pat; expr } =
   match pat with
   | Pat_var id | Pat_constraint (Pat_var id, _) ->
     let new_env, typ_p = infer_pat env pat in
     let new_env = (id, typ_p) :: new_env in
-    let new_env1, typ_e = infer_exp new_env expr in
+    let new_env1, typ_e =
+      match expr with
+      | Exp_ident eid when id = eid ->
+        failwith "this kind of expression is not allowed as right-hand side of `let rec'"
+      | _ -> infer_exp new_env expr
+    in
     (* unify typ_p (generalize typ_e); *)
     unify typ_p typ_e;
     let pat_names = get_pat_names [] pat in
@@ -377,6 +474,10 @@ and infer_exp env = function
        let typ_res = newvar () in
        unify typ_op (Type_arrow (typ_args, typ_res));
        new_env1, typ_res)
+  | Exp_apply (Exp_ident "-", arg) ->
+    let new_env1, typ_arg = infer_exp env arg in
+    unify typ_arg (Type_construct ("int", []));
+    new_env1, Type_construct ("int", [])
   | Exp_apply (f, arg) ->
     let new_env, typ_f = infer_exp env f in
     let new_env1, typ_arg = infer_exp new_env arg in
@@ -464,24 +565,35 @@ and infer_exp env = function
 let infer_structure_item env = function
   | Str_eval exp ->
     let _, typ = infer_exp env exp in
-    ("-", typ) :: env
+    ("-", typ) :: env, []
   | Str_value (Nonrecursive, (vb, vbs)) ->
+    let new_names =
+      List.fold_left (fun names { pat; _ } -> get_pat_names names pat) [] (vb :: vbs)
+    in
     let new_env = List.fold_left (fun env bind -> infer_vb env bind) env (vb :: vbs) in
-    new_env
+    new_env, new_names
   | Str_value (Recursive, (vb, vbs)) ->
+    let new_names =
+      List.fold_left (fun names { pat; _ } -> get_pat_names names pat) [] (vb :: vbs)
+    in
     let new_env = add_rec_names env (vb :: vbs) in
     let new_env1 =
       List.fold_left (fun env bind -> infer_vb_rec env bind) new_env (vb :: vbs)
     in
-    new_env1
+    new_env1, new_names
   | Str_adt _ -> failwith "str_adt will be removed"
 ;;
 
 let infer_program env prog =
-  let new_env =
-    List.fold_left (fun env str_item -> infer_structure_item env str_item) env prog
+  let new_env, new_names =
+    List.fold_left
+      (fun (env, names) str_item ->
+         let new_env, new_names = infer_structure_item env str_item in
+         new_env, new_names @ names)
+      (env, [])
+      prog
   in
-  new_env
+  new_env, new_names
 ;;
 
 let env_with_things =
@@ -494,6 +606,7 @@ let env_with_things =
     ; "print_int", Type_arrow (type_int, type_unit)
     ; "print_gc_status", Type_arrow (type_unit, type_unit)
     ; "collect", Type_arrow (type_unit, type_unit)
+    ; "alloc_block", Type_arrow (type_int, type_unit)
     ; "+", Type_arrow (type_int, Type_arrow (type_int, type_int))
     ; "-", Type_arrow (type_int, Type_arrow (type_int, type_int))
     ; "*", Type_arrow (type_int, Type_arrow (type_int, type_int))

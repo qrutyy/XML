@@ -1,7 +1,7 @@
 (library
  (name XML_unittests)
  (public_name XML.Many_tests.Unittests)
- (libraries stdio XML.Common XML.Middleend)
+ (libraries base stdio XML.Common XML.Middleend)
  (preprocess
   (pps ppx_expect ppx_inline_test ppx_expect))
  (instrumentation

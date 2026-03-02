@@ -24,13 +24,9 @@ let infer_pat_str ?(rst = true) ?(env = []) str =
 let infer_prog_str ?(env = env_with_things) str =
   let prog = parse_str str in
   reset_gensym ();
-  let new_env = infer_program env prog in
-  List.iter (fun (id, typ) ->
-    Format.printf "%s : " id;
-    pprint_typ Format.std_formatter typ;
-    Format.printf "\n%!")
-    new_env;
-  ()
+  let env, names = infer_program env prog in
+  let env = filter_env env names in
+  pprint_env env names
 
 let show_etyp env exp =
   let _, ty = infer_exp env exp in
@@ -77,28 +73,28 @@ let%expect_test "id not in env" =
    (Failure "unbound variable: m")
    Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
    Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-   Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 70, characters 2-23
+   Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 66, characters 2-23
    Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}];;
 
 
 let%expect_test "tuple 2" =
   infer_exp_str {| (1, 2) |};
-  [%expect{| (int * int) |}]
+  [%expect{| int * int |}]
 
 
 let%expect_test "tuple 3" =
   infer_exp_str {| (1, 2, 3) |};
-  [%expect{| (int * int * int) |}]
+  [%expect{| int * int * int |}]
 
 
   let%expect_test "tuple 4" =
   infer_exp_str {| (1, 2, 3, 4) |};
-  [%expect{| (int * int * int * int) |}]
+  [%expect{| int * int * int * int |}]
 
 
 let%expect_test "tuples in tuple" =
   infer_exp_str {| ((1, 2), (3, 4)) |};
-  [%expect{| ((int * int) * (int * int)) |}]
+  [%expect{| (int * int) * (int * int) |}]
 
 
  let%expect_test "construct none" =
@@ -120,7 +116,7 @@ let%expect_test "if (string) " =
 
   (Failure "can't unify different constructors: string and bool")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 402, characters 4-43
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 503, characters 4-43
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
@@ -136,9 +132,9 @@ let%expect_test "if (bool) then (not unit)" =
 
   (Failure "can't unify different constructors: int and unit")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 406, characters 7-46
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 507, characters 7-46
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 130, characters 2-41
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 126, characters 2-41
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -177,10 +173,10 @@ let%expect_test "apply int -> int to string" =
 
     (Failure "can't unify different constructors: int and string")
     Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-    Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 156, characters 4-15
-    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 384, characters 4-47
+    Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 239, characters 4-15
+    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 485, characters 4-47
     Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 171, characters 2-30
+    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 167, characters 2-30
     Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -208,11 +204,11 @@ let%expect_test "apply 'a to 'a (same var)" =
 
   (Failure "occurs check")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.occurs_check in file "lib/middleend/inferLayers.ml", line 139, characters 4-22
-  Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 153, characters 4-22
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 384, characters 4-47
+  Called from Middleend__InferLayers.occurs_check in file "lib/middleend/inferLayers.ml", line 222, characters 4-22
+  Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 236, characters 4-22
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 485, characters 4-47
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 202, characters 2-42
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 198, characters 2-42
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -257,22 +253,22 @@ let%expect_test "str" =
 
 let%expect_test "tuple 2" =
   infer_pat_str {| (1, 2) |};
-  [%expect {| (int * int) |}];;
+  [%expect {| int * int |}];;
 
 
 let%expect_test "tuple 3" =
   infer_pat_str {| (1, 2, 3) |};
-  [%expect {| (int * int * int) |}];;
+  [%expect {| int * int * int |}];;
 
 
 let%expect_test "tuple 4" =
   infer_pat_str {| (1, 2, 3, 4) |};
-   [%expect {| (int * int * int * int) |}];;
+   [%expect {| int * int * int * int |}];;
 
 
 let%expect_test "tuples in tuple" =
   infer_pat_str {| ((1, 2), (3, 4)) |};
-   [%expect {| ((int * int) * (int * int)) |}];;
+   [%expect {| (int * int) * (int * int) |}];;
 
 
 let%expect_test "construct none" =
@@ -282,31 +278,20 @@ let%expect_test "construct none" =
 
  let%expect_test "construct some" =
   infer_pat_str {| Some 1 |} ~env;
- [%expect.unreachable]
- [@@expect.uncaught_exn {|
-   (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-      This is strongly discouraged as backtraces are fragile.
-      Please change this test to not include a backtrace. *)
-
-   (Failure "cannot unify with a quantified type")
-   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-   Called from Middleend__InferLayers.infer_pat in file "lib/middleend/inferLayers.ml", line 270, characters 7-23
-   Called from XML_unittests__Infer.infer_pat_str in file "many_tests/unit/infer.ml", line 21, characters 14-31
-   Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 284, characters 2-33
-   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+ [%expect{| int option |}]
 
 
 (************************** Funs **************************)
 
 let%expect_test "fun 'a -> 'a (new var)" =
   infer_exp_str {| fun x -> x |};
-  [%expect {| ('a -> 'a) |}]
+  [%expect {| 'a -> 'a |}]
 
 
 let%expect_test "fun 'a -> 'a (shadow)" =
   let env = ["x", Type_var {contents = Unbound "type 's"}] in
   infer_exp_str {| fun x -> x |} ~env;
-  [%expect {| ('a -> 'a) |}]
+  [%expect {| 'a -> 'a |}]
 
 
 let%expect_test "fun 'a -> 'b (not in env)" =
@@ -319,26 +304,26 @@ let%expect_test "fun 'a -> 'b (not in env)" =
 
   (Failure "unbound variable: y")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 358, characters 14-35
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 455, characters 14-35
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 313, characters 2-32
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 298, characters 2-32
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
 let%expect_test "fun 'a -> 'b (in env)" =
   let env = ["y", Type_var {contents = Unbound "s"}] in
   infer_exp_str {| fun x -> y |} ~env;
-  [%expect{| ('a -> 's) |}]
+  [%expect{| 'a -> 's |}]
 
 
 let%expect_test _=
   infer_exp_str {| fun x -> fun y -> x y |};
- [%expect{| (('b -> 'c) -> ('b -> 'c)) |}]
+ [%expect{| ('b -> 'c) -> 'b -> 'c |}]
 
 
 let%expect_test _ =
   infer_exp_str {| fun x y -> x y |};
-  [%expect{| (('b -> 'c) -> ('b -> 'c)) |}]
+  [%expect{| ('b -> 'c) -> 'b -> 'c |}]
 
 
 let%expect_test _ =
@@ -351,10 +336,10 @@ let%expect_test _ =
 
     (Failure "can't unify different constructors: int and string")
     Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-    Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 156, characters 4-15
-    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 384, characters 4-47
+    Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 239, characters 4-15
+    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 485, characters 4-47
     Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 345, characters 2-68
+    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 330, characters 2-68
     Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -385,11 +370,11 @@ let%expect_test "match different constructors" =
 
   (Failure "can't unify different constructors: list and option")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 429, characters 11-33
+  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 530, characters 11-33
   Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 425, characters 6-685
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 526, characters 6-685
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 379, characters 2-63
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 364, characters 2-63
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -404,11 +389,11 @@ let%expect_test "match option with list constructors" =
 
   (Failure "can't unify different constructors: list and option")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 429, characters 11-33
+  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 530, characters 11-33
   Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 425, characters 6-685
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 526, characters 6-685
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 398, characters 2-64
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 383, characters 2-64
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -423,11 +408,11 @@ let%expect_test "match different types of expr 1" =
 
   (Failure "can't unify different constructors: char and int")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 440, characters 11-32
+  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 541, characters 11-32
   Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 425, characters 6-685
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 526, characters 6-685
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 417, characters 2-70
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 402, characters 2-70
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -442,24 +427,24 @@ let%expect_test "match different types of expr 2" =
 
   (Failure "can't unify different constructors: char and int")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 440, characters 11-32
+  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 541, characters 11-32
   Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 425, characters 6-685
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 526, characters 6-685
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 436, characters 2-90
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 421, characters 2-90
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
 let%expect_test "correct function" =
   infer_exp_str {| function | Some x -> 1 | None -> 2 |} ~env;
   [%expect {|
-    ('a option -> int) |}]
+    'd option -> int |}]
 
 
 let%expect_test "use function pattern in body" =
   infer_exp_str {| function | Some x -> x | None -> 2 |} ~env;
   [%expect {|
-    ('a option -> int) |}]
+    int option -> int |}]
 
 
 let%expect_test "function different constructors" =
@@ -472,11 +457,11 @@ let%expect_test "function different constructors" =
 
   (Failure "can't unify different constructors: list and option")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 453, characters 11-32
+  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 554, characters 11-32
   Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 450, characters 6-314
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 551, characters 6-314
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 466, characters 2-59
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 451, characters 2-59
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -490,11 +475,11 @@ let%expect_test "function different types of expr 1" =
 
   (Failure "can't unify different constructors: char and int")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 455, characters 11-32
+  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 556, characters 11-32
   Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 450, characters 6-314
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 551, characters 6-314
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 484, characters 2-66
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 469, characters 2-66
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -508,11 +493,11 @@ let%expect_test "function different types of expr 2" =
 
   (Failure "can't unify different constructors: char and int")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 455, characters 11-32
+  Called from Middleend__InferLayers.infer_exp.(fun) in file "lib/middleend/inferLayers.ml", line 556, characters 11-32
   Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 450, characters 6-314
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 551, characters 6-314
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 502, characters 2-86
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 487, characters 2-86
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -539,19 +524,19 @@ let%expect_test _ =
 
 
 let%expect_test "let poly" =
-  show_etyp [] (parse_exp_str {| let a = fun x -> x in a |});
-  [%expect {| (Type_arrow ((Type_var ref ((Unbound "d"))), (Type_var ref ((Unbound "d"))))) |}]
+  infer_exp_str {| let a = fun x -> x in a |};
+  [%expect {| 'c -> 'c |}]
 
 
 let%expect_test "let poly 2" =
   infer_exp_str {| let a = fun x -> x in (a 1, a "str") |};
-  [%expect{| (int * string) |}]
+  [%expect{| int * string |}]
 
 
 let%expect_test "poly in env" =
   let env = ["=", Type_arrow (Quant_type_var "a", Type_arrow(Quant_type_var "a", type_bool))] in
   infer_exp_str {| let a = 1 in 1 = 1, "str" = "str" |} ~env;
-  [%expect{| (bool * bool) |}]
+  [%expect{| bool * bool |}]
 
 
 let%expect_test _ =
@@ -569,12 +554,12 @@ let%expect_test _ =
 
   (Failure "cannot unify tuple types of different size")
   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 160, characters 9-62
-  Called from Middleend__InferLayers.infer_vb in file "lib/middleend/inferLayers.ml", line 309, characters 2-19
+  Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 243, characters 9-62
+  Called from Middleend__InferLayers.infer_vb in file "lib/middleend/inferLayers.ml", line 401, characters 2-19
   Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 413, characters 18-84
+  Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 514, characters 18-84
   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 563, characters 2-46
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 548, characters 2-46
   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -588,12 +573,12 @@ let%expect_test _ =
 
     (Failure "cannot unify tuple types of different size")
     Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-    Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 160, characters 9-62
-    Called from Middleend__InferLayers.infer_vb in file "lib/middleend/inferLayers.ml", line 309, characters 2-19
+    Called from Middleend__InferLayers.unify in file "lib/middleend/inferLayers.ml", line 243, characters 9-62
+    Called from Middleend__InferLayers.infer_vb in file "lib/middleend/inferLayers.ml", line 401, characters 2-19
     Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 413, characters 18-84
+    Called from Middleend__InferLayers.infer_exp in file "lib/middleend/inferLayers.ml", line 514, characters 18-84
     Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 582, characters 2-45
+    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 567, characters 2-45
     Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
 
 
@@ -603,25 +588,17 @@ let%expect_test "let and" =
 
 
 let%expect_test "factorial" =
-  let env = ["=", Type_arrow (Quant_type_var "a", Type_arrow(Quant_type_var "a", type_bool));
-             "*", Type_arrow (type_int, Type_arrow(type_int, type_int));
-             "-", Type_arrow (type_int, Type_arrow(type_int, type_int))] in
   infer_exp_str {| let rec fac n = if n = 1 then 1 else n * fac (n-1) in fac 4 |} ~env;
   [%expect {| int |}]
 
 
 let%expect_test "fibonacci" =
-  let env = ["<=", Type_arrow (Type_var {contents = Unbound "a"}, Type_arrow(Type_var {contents = Unbound "a"}, type_bool));
-             "-", Type_arrow (type_int, Type_arrow(type_int, type_int));
-             "+", Type_arrow (type_int, Type_arrow(type_int, type_int))] in
   infer_exp_str {| let rec fib n = if n <= 1 then 1 else (fib (n-1)) + (fib (n-2)) in fib 4 |} ~env;
   [%expect {| int |}]
 
 
 let%expect_test "mutual recursion" =
-  let env = ["=", Type_arrow (Type_var {contents = Unbound "a"}, Type_arrow(Type_var {contents = Unbound "a"}, type_bool));
-             "-", Type_arrow (type_int, Type_arrow(type_int, type_int));
-             "not", Type_arrow (type_bool, type_bool); "true", type_bool] in
+  let env = env @ ["not", Type_arrow (type_bool, type_bool); "true", type_bool] in
   infer_exp_str ~env {|
   let rec is_odd n =
     if n = 0 then true else is_even (n-1)
@@ -629,6 +606,76 @@ let%expect_test "mutual recursion" =
     in is_odd 5
   |};
   [%expect {| bool |}]
+
+
+let%expect_test "shadow with itself" =
+  infer_prog_str 
+  {|
+  let test3 a b c =
+    let a = print_int a in 0
+  |};
+[%expect{| val test3 : int -> 'a -> 'b -> int |}];;
+
+
+let%expect_test "shadow" =
+  infer_prog_str {|
+    let x = 5
+    
+    let x = "string"
+  |};
+[%expect {|
+  val x : string |}]
+
+
+let%expect_test "shadow with itself 2" =
+  infer_prog_str {|
+    let x = 5
+    
+    let x = x
+  |};
+[%expect {|
+  val x : int |}]
+
+
+let%expect_test "weird let rec" =
+  infer_prog_str {| let rec x = x |};
+[%expect.unreachable]
+[@@expect.uncaught_exn {|
+  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
+     This is strongly discouraged as backtraces are fragile.
+     Please change this test to not include a backtrace. *)
+
+  (Failure
+    "this kind of expression is not allowed as right-hand side of `let rec'")
+  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
+  Called from Middleend__InferLayers.infer_vb_rec in file "lib/middleend/inferLayers.ml", line 422, characters 8-89
+  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
+  Called from Middleend__InferLayers.infer_structure_item in file "lib/middleend/inferLayers.ml", line 581, characters 6-80
+  Called from Middleend__InferLayers.infer_program.(fun) in file "lib/middleend/inferLayers.ml", line 591, characters 34-67
+  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
+  Called from Middleend__InferLayers.infer_program in file "lib/middleend/inferLayers.ml", line 589, characters 4-189
+  Called from XML_unittests__Infer.infer_prog_str in file "many_tests/unit/infer.ml", line 27, characters 19-41
+  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 641, characters 2-36
+  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+
+
+let%expect_test "too polymorphic1" =
+  infer_prog_str {| let map f p = let (a,b) = p in (f a, f b) |};
+[%expect {| val map : ('a -> 'b) -> 'c * 'd -> 'b * 'b |}]
+
+let%expect_test "too polymorphic" =
+  show_etyp [] (parse_exp_str {| let map f p = let (a,b) = p in (f a, f b) in map |});
+[%expect {|
+  (Type_arrow (
+     (Type_arrow ((Type_var ref ((Unbound "s"))),
+        (Type_var ref ((Unbound "t"))))),
+     (Type_arrow (
+        (Type_tuple
+           ((Type_var ref ((Unbound "u"))), (Type_var ref ((Unbound "v"))), [])),
+        (Type_tuple
+           ((Type_var ref ((Unbound "t"))), (Type_var ref ((Unbound "t"))), []))
+        ))
+     )) |}]
 
 
 (* сделать pprint для текущего инфера

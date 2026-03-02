@@ -25,6 +25,15 @@ val pprint_typ
   -> typ
   -> unit
 
+(** [pprint_env env names] pretty-prints all types in environment [env] for
+  names in [names], skipping repeats or non-existent names *)
+val pprint_env : (ident * typ) list -> ident list -> unit
+
+(** [filter_env env names] filters [env], leaving only bindings for
+  the names from [names], if they are present in environment.
+  if [env] contains duplicates for the same name, only the first binding is preserved *)
+val filter_env : (ident * typ) list -> ident list -> (ident * typ) list
+
 (** resets counter for type variables *)
 val reset_gensym : unit -> unit
 
@@ -37,20 +46,20 @@ val infer_exp : (ident * typ) list -> Expression.t -> (ident * typ) list * typ
 val infer_pat : (ident * typ) list -> Pattern.t -> (ident * typ) list * typ
 
 (** [infer_structure_item env item] infers type of the item [item] in the environment [env] and returns
-  updated environment and type of [item] *)
+  updated environment and new names *)
 val infer_structure_item
   :  (ident * typ) list
   -> Structure.structure_item
-  -> (ident * typ) list
+  -> (ident * typ) list * ident list
 
 (** [infer_program env prog] infers all types in program [prog] with initial environment [env] and returns
-  updated environment
+  updated environment and names of all new global identificators
 
   for basic environment, use [env_with_things] *)
 val infer_program
   :  (ident * typ) list
   -> Structure.structure_item list
-  -> (ident * typ) list
+  -> (ident * typ) list * ident list
 
 (** [env_with_things] is the basic environment that contains built-in functions and constructors *)
 val env_with_things : (ident * typ) list
