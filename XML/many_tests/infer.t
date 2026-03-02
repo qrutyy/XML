@@ -77,18 +77,16 @@
   val foldl : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
   val main : unit
 
-map is wrong because gen is unsound?
   $ dune exec -- ../bin/XML_llvm.exe -fromfile manytests/typed/015tuples.ml -typedtree
   val fix : (('a -> 'b) -> 'a -> 'b) -> 'a -> 'b
-  val map : ('a -> 'b) -> 'c * 'd -> 'b * 'b
-  val fixpoly : 'a -> 'b -> 'c * 'b -> 'c
-  val feven : 'a * 'b -> int -> int
-  val fodd : 'a * 'b -> int -> int
-  val tie : 'a -> 'b * 'a -> 'b
+  val map : ('a -> 'b) -> 'a * 'a -> 'b * 'b
+  val fixpoly : 'a -> ('b -> 'c) * ('b -> 'c)
+  val feven : 'a * (int -> int) -> int -> int
+  val fodd : (int -> int) * 'a -> int -> int
+  val tie : ('a -> 'b) * ('a -> 'b)
   val meven : int -> int
   val modd : int -> int
   val main : int
-
 
   $ dune exec -- ../bin/XML_llvm.exe -fromfile manytests/typed/016lists.ml -typedtree
   val length : 'a list -> int

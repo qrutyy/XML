@@ -151,7 +151,7 @@ let pmultiargsapp pty =
 
 let ptypevar =
   let* id = token "'" *> (pident_lc <|> pident_cap) in
-  return (TypeExpr.Type_var { contents = Unbound id })
+  return (TypeExpr.Type_var { contents = Unbound (id, 0) })
 ;;
 
 let ptypetuple ptype =

@@ -9,8 +9,19 @@ open Common.Ast.Pattern
 open Common.Ast.TypeExpr
 open Common.Pprinter
 
+let current_level = ref 0
+let enter_level () = incr current_level
+let leave_level () = decr current_level
+
 let rec occurs_check tv = function
   | Type_var tv' when tv == tv' -> failwith "occurs check"
+  | Type_var ({ contents = Unbound (name, l) } as tv') ->
+    let min_lvl =
+      match !tv with
+      | Unbound (_, l') -> min l l'
+      | _ -> l
+    in
+    tv' := Unbound (name, min_lvl)
   | Type_var { contents = Link t } -> occurs_check tv t
   | Type_arrow (t1, t2) ->
     occurs_check tv t1;
@@ -48,7 +59,8 @@ let rec unify t1 t2 =
 ;;
 
 let rec generalize = function
-  | Type_var { contents = Unbound name } -> Quant_type_var name
+  | Type_var { contents = Unbound (name, l) } when l >= !current_level ->
+    Quant_type_var name
   | Type_var { contents = Link ty } -> generalize ty
   | Type_arrow (ty1, ty2) -> Type_arrow (generalize ty1, generalize ty2)
   | Type_tuple (t1, t2, tl) ->
@@ -69,7 +81,7 @@ let gensym : unit -> string =
   if n < 26 then String.make 1 (Char.chr (Char.code 'a' + n)) else "t" ^ string_of_int n
 ;;
 
-let newvar () = Type_var (ref (Unbound (gensym ())))
+let newvar () = Type_var (ref (Unbound (gensym (), !current_level)))
 
 let inst =
   let rec loop subst = function
@@ -294,13 +306,17 @@ and infer_exp env = function
        unify ty2 ty3;
        new_env, ty3)
   | Exp_let (Nonrecursive, (vb, vbs), exprb) ->
+    enter_level ();
     let new_env = List.fold_left (fun env bind -> infer_vb env bind) env (vb :: vbs) in
+    leave_level ();
     infer_exp new_env exprb
   | Exp_let (Recursive, (vb, vbs), exprb) ->
     let new_env = add_rec_names env (vb :: vbs) in
+    enter_level ();
     let new_env1 =
       List.fold_left (fun env bind -> infer_vb_rec env bind) new_env (vb :: vbs)
     in
+    leave_level ();
     infer_exp new_env1 exprb
   | Exp_match (expr, (case, rest)) ->
     let new_env, typ_main = infer_exp env expr in
@@ -356,16 +372,20 @@ let infer_structure_item env = function
     let new_names =
       List.fold_left (fun names { pat; _ } -> get_pat_names names pat) [] (vb :: vbs)
     in
+    (* enter_level (); *)
     let new_env = List.fold_left (fun env bind -> infer_vb env bind) env (vb :: vbs) in
+    (* leave_level (); *)
     new_env, new_names
   | Str_value (Recursive, (vb, vbs)) ->
     let new_names =
       List.fold_left (fun names { pat; _ } -> get_pat_names names pat) [] (vb :: vbs)
     in
     let new_env = add_rec_names env (vb :: vbs) in
+    (* enter_level (); *)
     let new_env1 =
       List.fold_left (fun env bind -> infer_vb_rec env bind) new_env (vb :: vbs)
     in
+    (* leave_level (); *)
     new_env1, new_names
   | Str_adt _ -> failwith "str_adts are not supported"
 ;;

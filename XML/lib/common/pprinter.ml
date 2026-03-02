@@ -136,11 +136,11 @@ and pprint_type fmt typ =
          ~sep:" * "
          (List.map
             ~f:(fun t ->
-              if is_tuple t
+              if is_tuple t || is_arrow t
               then asprintf "(%a)" pprint_type t
               else asprintf "%a" pprint_type t)
             (t1 :: t2 :: tl)))
-  | Type_var { contents = Unbound id } -> fprintf fmt "'%s" id
+  | Type_var { contents = Unbound (id, _) } -> fprintf fmt "'%s" id
   | Type_var { contents = Link t } -> pprint_type fmt t
   | Quant_type_var id -> fprintf fmt "'%s" id
   | Type_construct (name, []) -> fprintf fmt "%s" name

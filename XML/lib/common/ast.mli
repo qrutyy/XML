@@ -48,14 +48,8 @@ module Constant : sig
 end
 
 module TypeExpr : sig
-  (*
-     type t =
-    | Type_arrow of t * t (** Represents a function type: [T1 -> T2]. *)
-    | Type_var of ident (** Represents a type variable: ['a]. *)
-    | Type_tuple of t List2.t (** Represents a tuple type: [(T1, T2, ..., Tn)]. *)
-    | Type_construct of ident * t list
-    (** Represents a type constructor with arguments: [C T1 ... Tn]. *)
-  *)
+  type level = int
+
   type t =
     | Type_arrow of t * t
     | Type_tuple of t List2.t
@@ -64,7 +58,7 @@ module TypeExpr : sig
     | Type_construct of ident * t list
 
   and tv =
-    | Unbound of ident
+    | Unbound of ident * level
     | Link of t
 
   val equal : t -> t -> bool
