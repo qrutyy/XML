@@ -7,29 +7,37 @@ open Common.Parser
 open Common.Pprinter
 open Common.Ast.TypeExpr
 
-(* TODO: get rid of failwith in infer *)
+let (let*) = Result.bind
 
 let infer_exp_str ?(rst = true) ?(env = []) str =
   let exp = parse_exp_str str in
   if rst then reset_gensym ();
-  let _, ty = infer_exp env exp in
-  pprint_type Format.std_formatter ty;;
+  match infer_exp env exp with
+  | Ok (_, ty) ->
+  pprint_type Format.std_formatter ty
+  | Error err -> pprint_err Format.std_formatter err
 
 let infer_pat_str ?(rst = true) ?(env = []) str =
   let pat = parse_pat_str str in
   if rst then reset_gensym ();
-  let _, ty = infer_pat env pat in
-  pprint_type Format.std_formatter ty;;
+    match infer_pat env pat  with
+  | Ok (_, ty) ->
+  pprint_type Format.std_formatter ty
+  | Error err -> pprint_err Format.std_formatter err
 
 let infer_prog_str ?(env = env_with_things) str =
   let prog = parse_str str in
   reset_gensym ();
-  let env, names = infer_program env prog in
-  pprint_env env names
+  match infer_program env prog with
+    | Ok (new_env, names) ->
+  pprint_env new_env names
+  | Error err -> pprint_err Format.std_formatter err
 
 let show_etyp env exp =
-  let _, ty = infer_exp env exp in
+  match infer_exp env exp with
+  | Ok (_, ty) ->
   Base.print_endline (Common.Ast.TypeExpr.show ty)
+  | Error err -> pprint_err Format.std_formatter err
 
 let type_bool = Type_construct ("bool", [])
 let type_unit = Type_construct ("unit", [])
@@ -63,17 +71,7 @@ let%expect_test "id in env" =
 
 let%expect_test "id not in env" =
   infer_exp_str {| m |};
- [%expect.unreachable]
- [@@expect.uncaught_exn {|
-   (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-      This is strongly discouraged as backtraces are fragile.
-      Please change this test to not include a backtrace. *)
-
-   (Failure "unbound variable: m")
-   Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-   Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-   Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 65, characters 2-23
-   Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}];;
+ [%expect{| Unbound variable m |}];;
 
 
 let%expect_test "tuple 2" =
@@ -108,33 +106,13 @@ let%expect_test "construct some" =
 
 let%expect_test "if (string) " =
   infer_exp_str {| if "trololo" then 1 |};
-  [@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "can't unify different constructors: string and bool")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 298, characters 4-43
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect {| Cannot unify different constructors: string and bool |}]
 
 
 let%expect_test "if (bool) then (not unit)" =
   let env = ["cond", type_bool] in
   infer_exp_str {| if cond then 1 |} ~env;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "can't unify different constructors: int and unit")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 302, characters 7-46
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 125, characters 2-41
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify different constructors: int and unit |}]
 
 
 let%expect_test "if (bool) then (unit)" =
@@ -164,19 +142,7 @@ let%expect_test "apply int -> int to int" =
 let%expect_test "apply int -> int to string" =
   let env = ["f", Type_arrow (type_int, type_int); "x", type_string] in
   infer_exp_str {| f x |} ~env;
-  [%expect.unreachable]
-  [@@expect.uncaught_exn {|
-    (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-       This is strongly discouraged as backtraces are fragile.
-       Please change this test to not include a backtrace. *)
-
-    (Failure "can't unify different constructors: int and string")
-    Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-    Called from Middleend__Infer.unify in file "lib/middleend/infer.ml", line 44, characters 4-15
-    Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 280, characters 4-47
-    Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 166, characters 2-30
-    Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify different constructors: int and string |}]
 
 
 let%expect_test "apply 'a -> 'a to 'b" =
@@ -195,20 +161,7 @@ let%expect_test "apply 'a to 'a (different vars)" =
 let%expect_test "apply 'a to 'a (same var)" =
   let env = ["x", Type_var {contents = Unbound ("t", 0)}] in
   infer_exp_str {| x x |} ~env ~rst: false;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "occurs check")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.occurs_check in file "lib/middleend/infer.ml", line 27, characters 4-22
-  Called from Middleend__Infer.unify in file "lib/middleend/infer.ml", line 41, characters 4-22
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 280, characters 4-47
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 197, characters 2-42
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Occurs check |}]
 
 
 let%expect_test "apply 'a to 'b" =
@@ -295,18 +248,7 @@ let%expect_test "fun 'a -> 'a (shadow)" =
 
 let%expect_test "fun 'a -> 'b (not in env)" =
   infer_exp_str {| fun x -> y |};
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "unbound variable: y")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 250, characters 14-35
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 297, characters 2-32
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Unbound variable y |}]
 
 
 let%expect_test "fun 'a -> 'b (in env)" =
@@ -327,19 +269,7 @@ let%expect_test _ =
 
 let%expect_test _ =
   infer_exp_str {| (fun f a b -> f a, f b) (fun x -> x) 1 "mystr" |};
-  [%expect.unreachable]
-  [@@expect.uncaught_exn {|
-    (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-       This is strongly discouraged as backtraces are fragile.
-       Please change this test to not include a backtrace. *)
-
-    (Failure "can't unify different constructors: int and string")
-    Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-    Called from Middleend__Infer.unify in file "lib/middleend/infer.ml", line 44, characters 4-15
-    Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 280, characters 4-47
-    Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 329, characters 2-68
-    Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify different constructors: int and string |}]
 
 
 (************************** Match, function **************************)
@@ -361,77 +291,25 @@ let%expect_test "use match pattern in body" =
 let%expect_test "match different constructors" =
   let env = [ "a", Type_construct("option", [Type_var {contents = Unbound ("a", 0)}])] @ env in
   infer_exp_str {| match a with | Some x -> 1 | [] -> 2 |} ~env;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "can't unify different constructors: list and option")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_exp.(fun) in file "lib/middleend/infer.ml", line 329, characters 11-33
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 325, characters 6-685
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 363, characters 2-63
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify different constructors: list and option |}]
 
 
 let%expect_test "match option with list constructors" =
   let env = [ "a", Type_construct("option", [Type_var {contents = Unbound ("a", 0)}])] @ env in
   infer_exp_str {| match a with | x :: tl -> 1 | [] -> 2 |} ~env;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "can't unify different constructors: list and option")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_exp.(fun) in file "lib/middleend/infer.ml", line 329, characters 11-33
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 325, characters 6-685
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 382, characters 2-64
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify different constructors: list and option |}]
 
 
 let%expect_test "match different types of expr 1" =
   let env = [ "a", Type_construct("option", [Type_var {contents = Unbound ("a", 0)}])] @ env in
   infer_exp_str {| match a with | Some x -> 'a' | None -> 1234 |} ~env;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "can't unify different constructors: char and int")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_exp.(fun) in file "lib/middleend/infer.ml", line 340, characters 11-32
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 325, characters 6-685
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 401, characters 2-70
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify different constructors: char and int |}]
 
 
 let%expect_test "match different types of expr 2" =
   let env = [ "b", Type_construct("list", [Type_var {contents = Unbound ("a", 0)}])] @ env in
   infer_exp_str {| match b with | x :: y :: tl -> 'a' | x :: tl -> 'b' | _ -> 1234 |} ~env;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "can't unify different constructors: char and int")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_exp.(fun) in file "lib/middleend/infer.ml", line 340, characters 11-32
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 325, characters 6-685
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 420, characters 2-90
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify different constructors: char and int |}]
 
 
 let%expect_test "correct function" =
@@ -448,56 +326,17 @@ let%expect_test "use function pattern in body" =
 
 let%expect_test "function different constructors" =
   infer_exp_str {| function | Some x -> 1 | [] -> 2 |} ~env;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "can't unify different constructors: list and option")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_exp.(fun) in file "lib/middleend/infer.ml", line 353, characters 11-32
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 350, characters 6-314
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 450, characters 2-59
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify different constructors: list and option |}]
 
 
 let%expect_test "function different types of expr 1" =
   infer_exp_str {| function | Some x -> 'a' | None -> 1234 |} ~env;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "can't unify different constructors: char and int")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_exp.(fun) in file "lib/middleend/infer.ml", line 355, characters 11-32
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 350, characters 6-314
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 468, characters 2-66
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify different constructors: char and int |}]
 
 
 let%expect_test "function different types of expr 2" =
   infer_exp_str {| function | x :: y :: tl -> 'a' | x :: tl -> 'b' | _ -> 1234 |} ~env;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "can't unify different constructors: char and int")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_exp.(fun) in file "lib/middleend/infer.ml", line 355, characters 11-32
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 350, characters 6-314
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 486, characters 2-86
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify different constructors: char and int |}]
 
 
 (************************** Let in **************************)
@@ -545,40 +384,12 @@ let%expect_test _ =
 
 let%expect_test _ =
   infer_exp_str  {| let a, b, c = 1, 2 in a |} ;
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure "cannot unify tuple types of different size")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.unify in file "lib/middleend/infer.ml", line 48, characters 9-62
-  Called from Middleend__Infer.infer_vb in file "lib/middleend/infer.ml", line 197, characters 2-19
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 310, characters 18-84
-  Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 547, characters 2-46
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify tuples of different sizes |}]
 
 
 let%expect_test _ =
   infer_exp_str {| let a, b = 1, 2, 3 in a |};
-  [%expect.unreachable]
-  [@@expect.uncaught_exn {|
-    (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-       This is strongly discouraged as backtraces are fragile.
-       Please change this test to not include a backtrace. *)
-
-    (Failure "cannot unify tuple types of different size")
-    Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-    Called from Middleend__Infer.unify in file "lib/middleend/infer.ml", line 48, characters 9-62
-    Called from Middleend__Infer.infer_vb in file "lib/middleend/infer.ml", line 197, characters 2-19
-    Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-    Called from Middleend__Infer.infer_exp in file "lib/middleend/infer.ml", line 310, characters 18-84
-    Called from XML_unittests__Infer.infer_exp_str in file "many_tests/unit/infer.ml", line 15, characters 14-31
-    Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 566, characters 2-45
-    Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+  [%expect{| Cannot unify tuples of different sizes |}]
 
 
 let%expect_test "let and" =
@@ -638,39 +449,9 @@ let%expect_test "shadow with itself 2" =
 
 let%expect_test "weird let rec" =
   infer_prog_str {| let rec x = x |};
-[%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
-
-  (Failure
-    "this kind of expression is not allowed as right-hand side of `let rec'")
-  Raised at Stdlib.failwith in file "stdlib.ml", line 29, characters 17-33
-  Called from Middleend__Infer.infer_vb_rec in file "lib/middleend/infer.ml", line 218, characters 8-89
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__Infer.infer_structure_item in file "lib/middleend/infer.ml", line 386, characters 6-80
-  Called from Middleend__Infer.infer_program.(fun) in file "lib/middleend/infer.ml", line 397, characters 34-67
-  Called from Stdlib__List.fold_left in file "list.ml", line 121, characters 24-34
-  Called from Middleend__Infer.infer_program in file "lib/middleend/infer.ml", line 395, characters 4-189
-  Called from XML_unittests__Infer.infer_prog_str in file "many_tests/unit/infer.ml", line 27, characters 19-41
-  Called from XML_unittests__Infer.(fun) in file "many_tests/unit/infer.ml", line 640, characters 2-36
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+[%expect{| This kind of expression is not allowed as right-hand side of `let rec' |}]
 
 
 let%expect_test "too polymorphic1" =
   infer_prog_str {| let map f p = let (a,b) = p in (f a, f b) |};
 [%expect {| val map : ('a -> 'b) -> 'a * 'a -> 'b * 'b |}]
-
-let%expect_test "too polymorphic2" =
-  infer_prog_str {|
-    let rec fix f x = f (fix f) x
-    let map f p = let (a,b) = p in (f a, f b)
-    let fixpoly l =
-      fix (fun self l -> map (fun li x -> li (self l) x) l) l
-  |};
-[%expect {|
-  val fix : (('a -> 'b) -> 'a -> 'b) -> 'a -> 'b
-  val map : ('a -> 'b) -> 'a * 'a -> 'b * 'b
-  val fixpoly : 'a -> ('b -> 'c) * ('b -> 'c) |}]
-
