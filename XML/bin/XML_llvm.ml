@@ -3,6 +3,7 @@
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 open Format
+open Common.Pprinter
 
 (* ------------------------------- *)
 (*       Command-line Options      *)
@@ -38,35 +39,19 @@ let to_llvm_ir ast options =
   Backend.Codegen_llvm.gen_program_ir ll_anf target opt
 ;;
 
-(* in *)
-(* Buffer.contents buf *)
-
 let compile_and_write options source_code =
   let ast = Common.Parser.parse_str source_code in
   (if options.check_types
    then
-     let open Middleend.InferLayers in
-     let env, names =
-       (* Middleend.Infer.run_infer_program ast Middleend.Infer.env_with_things *)
-       infer_program env_with_things ast
-     in
-     (* List.iter (fun id -> printf "%s\n" id) names; *)
-     (* match typedtree with
-     | Error err ->
-      Format.printf "Type error: %a\n" Middleend.InferTypes.pp_inf_err err;
-      exit 1
-    | Ok (env, names) ->
-      if options.show_types
-      then (
-        Middleend.Infer.pprint_result env names;
-        exit 0)
-      else ()); *)
-     if options.show_types
-     then (
-       let env = filter_env env names in
-       pprint_env env names;
-       exit 0)
-     else ());
+     let open Middleend.Infer in
+     match infer_program env_with_things ast with
+     | Ok (env, names) ->
+       if options.show_types
+       then (
+         pprint_env env names;
+         exit 0)
+       else ()
+     | Error err -> Format.printf "Type error: %a\n" Middleend.Infer.pprint_err err);
   if options.show_ast
   then (
     (* printf "%a\n" Common.Pprinter.pprint_program ast; *)
@@ -169,9 +154,6 @@ let () =
     ; ( "--ll"
       , Arg.Unit (fun () -> options.show_ll <- true)
       , "         Show ANF after lambda lifting and exit" )
-      (* ( "--gc-stats"
-      , Arg.Unit (fun () -> options.gc_stats <- true)
-      , "     Enable GC statistics and force a collection at program start/end" ) *)
     ; ( "-O"
       , Arg.String (fun opt -> options.optimization_lvl <- Some opt)
       , "         Set IR optimization level, \"O0\" by default" )

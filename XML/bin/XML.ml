@@ -3,6 +3,7 @@
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 open Format
+open Common.Pprinter
 
 (* ------------------------------- *)
 (*       Command-line Options      *)
@@ -18,6 +19,7 @@ type options =
   ; mutable show_ll : bool
   ; mutable gc_stats : bool
   ; mutable check_types : bool
+  ; mutable show_types : bool
   }
 
 (* ------------------------------- *)
@@ -37,16 +39,17 @@ let to_asm ~gc_stats ast : string =
 
 let compile_and_write options source_code =
   let ast = Common.Parser.parse_str source_code in
-  if options.check_types
-  then (
-    let typedtree =
-      Middleend.Infer.run_infer_program ast Middleend.Infer.env_with_things
-    in
-    match typedtree with
-    | Error err ->
-      Format.printf "Type error: %a\n" Middleend.InferTypes.pp_inf_err err;
-      exit 1
-    | Ok (_, _) -> ());
+  (if options.check_types
+   then
+     let open Middleend.Infer in
+     match infer_program env_with_things ast with
+     | Ok (env, names) ->
+       if options.show_types
+       then (
+         pprint_env env names;
+         exit 0)
+       else ()
+     | Error err -> Format.printf "Type error: %a\n" Middleend.Infer.pprint_err err);
   if options.show_ast
   then (
     printf "%a\n" Common.Pprinter.pprint_program ast;
@@ -118,6 +121,7 @@ let () =
     ; show_ll = false
     ; gc_stats = false
     ; check_types = true
+    ; show_types = false
     }
   in
   let usage_msg =
@@ -151,6 +155,9 @@ let () =
     ; ( "-notypes"
       , Arg.Unit (fun () -> options.check_types <- false)
       , "         Do not typecheck the program before compilation" )
+    ; ( "-typedtree"
+      , Arg.Unit (fun () -> options.show_types <- true)
+      , "         Show all names with their types and exit" )
     ]
   in
   let handle_anon_arg filename =
