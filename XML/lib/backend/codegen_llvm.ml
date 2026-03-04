@@ -328,17 +328,19 @@ let gen_function fmap the_mod name params body =
   in
   let bb = Llvm.append_block context "entry" the_fun in
   Llvm.position_at_end bb builder;
-  let env = ref ParamMap.empty in
-  Array.iteri
-    (fun i pval ->
-       let name = List.nth params i in
-       Llvm.set_value_name name pval;
-       let alloca = create_entry_alloca the_fun name in
-       let store = Llvm.build_store pval alloca builder in
-       Llvm.set_alignment gl_align store;
-       env := ParamMap.add name alloca !env)
-    (Llvm.params the_fun);
-  let ret_val, _ = gen_anf_expr fmap !env body in
+  let env =
+    List.fold_left2
+      (fun env name pval ->
+         Llvm.set_value_name name pval;
+         let alloca = create_entry_alloca the_fun name in
+         let store = Llvm.build_store pval alloca builder in
+         Llvm.set_alignment gl_align store;
+         ParamMap.add name alloca env)
+      ParamMap.empty
+      params
+      (Array.to_list (Llvm.params the_fun))
+  in
+  let ret_val, _ = gen_anf_expr fmap env body in
   let _ = Llvm.build_ret ret_val builder in
   if Llvm_analysis.verify_function the_fun
   then ()
