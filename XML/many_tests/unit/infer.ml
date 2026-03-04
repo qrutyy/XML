@@ -262,12 +262,12 @@ let%expect_test _=
  [%expect{| ('b -> 'c) -> 'b -> 'c |}]
 
 
-let%expect_test _ =
+let%expect_test {| fun x y -> x y |} =
   infer_exp_str {| fun x y -> x y |};
   [%expect{| ('b -> 'c) -> 'b -> 'c |}]
 
 
-let%expect_test _ =
+let%expect_test {| (fun f a b -> f a, f b) (fun x -> x) 1 "mystr" |}  =
   infer_exp_str {| (fun f a b -> f a, f b) (fun x -> x) 1 "mystr" |};
   [%expect{| Cannot unify different constructors: int and string |}]
 
@@ -341,22 +341,22 @@ let%expect_test "function different types of expr 2" =
 
 (************************** Let in **************************)
 
-let%expect_test _ =
+let%expect_test {| let 1 = 1 in 2 |}  =
   infer_exp_str {| let 1 = 1 in 2 |};
   [%expect{| int |}]
 
 
-let%expect_test _ =
+let%expect_test {| let a = 1 in 2 |} =
   infer_exp_str {| let a = 1 in 2 |};
   [%expect{| int |}]
 
 
-let%expect_test _ =
+let%expect_test {| let a = 1 in a |} =
 infer_exp_str {| let a = 1 in a |};
   [%expect{| int |}]
 
 
-let%expect_test _ =
+let%expect_test {| let a = 1 in "str" |} =
   infer_exp_str {| let a = 1 in "str" |};
   [%expect{| string |}]
 
@@ -377,17 +377,17 @@ let%expect_test "poly in env" =
   [%expect{| bool * bool |}]
 
 
-let%expect_test _ =
+let%expect_test {| let a, b = 1, 2 in a |} =
   infer_exp_str  {| let a, b = 1, 2 in a |} ;
   [%expect{| int |}]
 
 
-let%expect_test _ =
+let%expect_test {| let a, b, c = 1, 2 in a |} =
   infer_exp_str  {| let a, b, c = 1, 2 in a |} ;
   [%expect{| Cannot unify tuples of different sizes |}]
 
 
-let%expect_test _ =
+let%expect_test {| let a, b = 1, 2, 3 in a |} =
   infer_exp_str {| let a, b = 1, 2, 3 in a |};
   [%expect{| Cannot unify tuples of different sizes |}]
 
