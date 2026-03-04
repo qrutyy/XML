@@ -15,6 +15,7 @@ let block_elms_type = Llvm.array_type i64_type 0
 let block_type = Llvm.struct_type context [| gcheader_type; i64_type; block_elms_type |]
 let ptr_type = Llvm.pointer_type context
 let builder = Llvm.builder context
+let subst_main = "__user_main"
 let named_values : (string, Llvm.llvalue) Hashtbl.t = Hashtbl.create 32
 
 module FuncMap = struct
@@ -101,6 +102,7 @@ let build_call_mb_void ftype fval argvs name =
 ;;
 
 let decl_and_bind fmap the_mod id retty argc =
+  let id = if id = "main" then subst_main else id in
   match FuncMap.find fmap id with
   | Some (_, _, FuncMap.Lib) -> fmap
   | _ when argc = 0 -> fmap
@@ -136,8 +138,6 @@ let build_alloc_closure fmap func =
   let argc = Array.length (Llvm.params func) in
   let argc = Llvm.const_int i64_type argc in
   let func_as_i64 = Llvm.build_pointercast func i64_type "func_as_i64" builder in
-  (* _print_untag fmap func_as_i64;
-  _print_untag fmap argc; *)
   Llvm.build_call actyp acval [| func_as_i64; argc |] "closure_tmp" builder
 ;;
 
@@ -150,6 +150,7 @@ let gen_im_expr_ir fmap = function
        Llvm.set_alignment gl_align temp;
        temp
      | None ->
+       let id = if id = "main" then subst_main else id in
        (match FuncMap.find fmap id with
         | Some (fval, ftyp, _) ->
           if Array.length (Llvm.params fval) = 0
@@ -218,8 +219,6 @@ let build_apply_part fmap fclos args =
   List.fold_left
     (fun clos arg ->
        let clos_as_i64 = Llvm.build_pointercast clos i64_type "clos_as_i64" builder in
-       (* _print_untag fmap clos_as_i64;
-       _print_untag fmap arg; *)
        build_call_mb_void aptyp apval [| clos_as_i64; arg |] "apptmp")
     fclos
     args
@@ -229,8 +228,9 @@ let rec gen_comp_expr_ir fmap = function
   | Comp_imm imm -> gen_im_expr_ir fmap imm
   | Comp_binop (op, lhs, rhs) -> gen_tagged_binop fmap op lhs rhs
   | Comp_app (Imm_ident f, args) ->
+    let f_map = if f = "main" then subst_main else f in
     (* Format.printf "Id: %s got called with %d args\n" f (List.length args); *)
-    (match FuncMap.find fmap f with
+    (match FuncMap.find fmap f_map with
      | Some (fval, ftype, _) ->
        let pvs = Llvm.params fval in
        let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
@@ -322,6 +322,7 @@ and gen_anf_expr fmap = function
 
 let gen_function fmap the_mod name params body =
   Hashtbl.clear named_values;
+  let name = if name = "main" then subst_main else name in
   let param_types = Array.map (fun _ -> i64_type) (Array.of_list params) in
   let f_type = Llvm.function_type i64_type param_types in
   let the_fun =

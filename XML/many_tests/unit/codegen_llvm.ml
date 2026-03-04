@@ -395,3 +395,174 @@ let%expect_test "partial " =
       call void @collect()
       ret i64 0
     } |}]
+
+
+let%expect_test "user main" =
+  codegen_prog_str {|
+  let main x = x
+  
+  let a = print_int (main 5)
+  |};
+  [%expect{|
+    ; ModuleID = 'main'
+    source_filename = "main"
+    target triple = "riscv64-unknown-linux-gnu"
+
+    declare void @print_int(i64)
+
+    declare i64 @alloc_block(i64)
+
+    declare i64 @alloc_closure(i64, i64)
+
+    declare i64 @apply1(i64, i64)
+
+    declare void @print_gc_status()
+
+    declare void @collect()
+
+    declare i64 @create_tuple(i64)
+
+    declare i64 @create_tuple_init(i64, i64)
+
+    declare i64 @field(i64, i64)
+
+    declare void @rt_init(i64)
+
+    define i64 @__user_main(i64 %x) {
+    entry:
+      %x1 = alloca i64, align 8
+      store i64 %x, ptr %x1, align 8
+      %x2 = load i64, ptr %x1, align 8
+      ret i64 %x2
+    }
+
+    define i64 @main() {
+    entry:
+      %a = alloca i64, align 8
+      %t_2 = alloca i64, align 8
+      %t_1 = alloca i64, align 8
+      call void @rt_init(i64 5120)
+      %calltmp = call i64 @__user_main(i64 11)
+      store i64 %calltmp, ptr %t_1, align 8
+      %t_11 = load i64, ptr %t_1, align 8
+      call void @print_int(i64 %t_11)
+      store i64 0, ptr %t_2, align 8
+      %t_22 = load i64, ptr %t_2, align 8
+      store i64 %t_22, ptr %a, align 8
+      call void @collect()
+      ret i64 0
+    } |}]
+
+
+let%expect_test "use reserved name" =
+  codegen_prog_str {|
+  let some_fun x y = x + y
+  let closure_tmp x y = x + y
+  
+  let a = print_int (some_fun 5 10)
+  let b = print_int (closure_tmp 5 10)
+  let closure_tmp = 5
+  let c = print_int closure_tmp
+  |};
+  [%expect{|
+    ; ModuleID = 'main'
+    source_filename = "main"
+    target triple = "riscv64-unknown-linux-gnu"
+
+    declare void @print_int(i64)
+
+    declare i64 @alloc_block(i64)
+
+    declare i64 @alloc_closure(i64, i64)
+
+    declare i64 @apply1(i64, i64)
+
+    declare void @print_gc_status()
+
+    declare void @collect()
+
+    declare i64 @create_tuple(i64)
+
+    declare i64 @create_tuple_init(i64, i64)
+
+    declare i64 @field(i64, i64)
+
+    declare void @rt_init(i64)
+
+    define i64 @some_fun(i64 %x, i64 %y) {
+    entry:
+      %t_0 = alloca i64, align 8
+      %y2 = alloca i64, align 8
+      %x1 = alloca i64, align 8
+      store i64 %x, ptr %x1, align 8
+      store i64 %y, ptr %y2, align 8
+      %x3 = load i64, ptr %x1, align 8
+      %y4 = load i64, ptr %y2, align 8
+      %addtmp1 = add i64 %x3, %y4
+      %addtmp2 = sub i64 %addtmp1, 1
+      store i64 %addtmp2, ptr %t_0, align 8
+      %t_05 = load i64, ptr %t_0, align 8
+      ret i64 %t_05
+    }
+
+    define i64 @closure_tmp(i64 %x, i64 %y) {
+    entry:
+      %t_2 = alloca i64, align 8
+      %y2 = alloca i64, align 8
+      %x1 = alloca i64, align 8
+      store i64 %x, ptr %x1, align 8
+      store i64 %y, ptr %y2, align 8
+      %x3 = load i64, ptr %x1, align 8
+      %y4 = load i64, ptr %y2, align 8
+      %addtmp1 = add i64 %x3, %y4
+      %addtmp2 = sub i64 %addtmp1, 1
+      store i64 %addtmp2, ptr %t_2, align 8
+      %t_25 = load i64, ptr %t_2, align 8
+      ret i64 %t_25
+    }
+
+    define i64 @main() {
+    entry:
+      %c = alloca i64, align 8
+      %t_10 = alloca i64, align 8
+      %closure_tmp9 = alloca i64, align 8
+      %b = alloca i64, align 8
+      %t_9 = alloca i64, align 8
+      %t_8 = alloca i64, align 8
+      %t_7 = alloca i64, align 8
+      %a = alloca i64, align 8
+      %t_6 = alloca i64, align 8
+      %t_5 = alloca i64, align 8
+      %t_4 = alloca i64, align 8
+      call void @rt_init(i64 5120)
+      %closure_tmp = call i64 @alloc_closure(i64 ptrtoint (ptr @some_fun to i64), i64 2)
+      %apptmp = call i64 @apply1(i64 %closure_tmp, i64 11)
+      store i64 %apptmp, ptr %t_4, align 8
+      %t_4_val = load i64, ptr %t_4, align 8
+      %apptmp1 = call i64 @apply1(i64 %t_4_val, i64 21)
+      store i64 %apptmp1, ptr %t_5, align 8
+      %t_52 = load i64, ptr %t_5, align 8
+      call void @print_int(i64 %t_52)
+      store i64 0, ptr %t_6, align 8
+      %t_63 = load i64, ptr %t_6, align 8
+      store i64 %t_63, ptr %a, align 8
+      %closure_tmp4 = call i64 @alloc_closure(i64 ptrtoint (ptr @closure_tmp to i64), i64 2)
+      %apptmp5 = call i64 @apply1(i64 %closure_tmp4, i64 11)
+      store i64 %apptmp5, ptr %t_7, align 8
+      %t_7_val = load i64, ptr %t_7, align 8
+      %apptmp6 = call i64 @apply1(i64 %t_7_val, i64 21)
+      store i64 %apptmp6, ptr %t_8, align 8
+      %t_87 = load i64, ptr %t_8, align 8
+      call void @print_int(i64 %t_87)
+      store i64 0, ptr %t_9, align 8
+      %t_98 = load i64, ptr %t_9, align 8
+      store i64 %t_98, ptr %b, align 8
+      store i64 11, ptr %closure_tmp9, align 8
+      %closure_tmp10 = load i64, ptr %closure_tmp9, align 8
+      call void @print_int(i64 %closure_tmp10)
+      store i64 0, ptr %t_10, align 8
+      %t_1011 = load i64, ptr %t_10, align 8
+      store i64 %t_1011, ptr %c, align 8
+      call void @collect()
+      ret i64 0
+    } |}]

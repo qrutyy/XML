@@ -324,3 +324,30 @@
   GC    allocations: 30002
   =================
   1
+
+  $ ../bin/XML_llvm.exe -o user_main.ll -notypes <<EOF
+  > let main x = x
+  > 
+  > let a = print_int (main 5)
+
+  $ llc-18 user_main.ll -o temp.s
+  $ clang-18  --target=riscv64-linux-gnu  -static temp.s runtime.o -o temp.exe
+  $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./temp.exe
+  5
+
+
+  $ ../bin/XML_llvm.exe -o use_reserved_name.ll -notypes <<EOF
+  > let some_fun x y = x + y
+  > let closure_tmp x y = x + y
+  > 
+  > let a = print_int (some_fun 5 10)
+  > let b = print_int (closure_tmp 5 10)
+  > let closure_tmp = 5
+  > let c = print_int closure_tmp
+
+  $ llc-18 use_reserved_name.ll -o temp.s
+  $ clang-18  --target=riscv64-linux-gnu  -static temp.s runtime.o -o temp.exe
+  $ qemu-riscv64 -L /usr/riscv64-linux-gnu/ -cpu rv64 ./temp.exe
+  15
+  15
+  5
