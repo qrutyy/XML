@@ -16,7 +16,8 @@ let block_type = Llvm.struct_type context [| gcheader_type; i64_type; block_elms
 let ptr_type = Llvm.pointer_type context
 let builder = Llvm.builder context
 let subst_main = "__user_main"
-let named_values : (string, Llvm.llvalue) Hashtbl.t = Hashtbl.create 32
+
+module ParamMap = Map.Make (String)
 
 module FuncMap = struct
   module K = struct
@@ -141,10 +142,10 @@ let build_alloc_closure fmap func =
   Llvm.build_call actyp acval [| func_as_i64; argc |] "closure_tmp" builder
 ;;
 
-let gen_im_expr_ir fmap = function
+let gen_im_expr_ir fmap env = function
   | Imm_num n -> Llvm.const_int i64_type ((n lsl 1) lor 1)
   | Imm_ident id ->
-    (match Hashtbl.find_opt named_values id with
+    (match ParamMap.find_opt id env with
      | Some v ->
        let temp = Llvm.build_load i64_type v id builder in
        Llvm.set_alignment gl_align temp;
@@ -155,9 +156,7 @@ let gen_im_expr_ir fmap = function
         | Some (fval, ftyp, _) ->
           if Array.length (Llvm.params fval) = 0
           then build_call_mb_void ftyp fval [||] "calltmp"
-          else
-            (* return a pointer to a closure *)
-            build_alloc_closure fmap fval
+          else build_alloc_closure fmap fval
         | None -> invalid_arg ("Name not bound: " ^ id)))
 ;;
 
@@ -167,14 +166,12 @@ let create_entry_alloca the_fun var_name =
 ;;
 
 (* working with tagged integers *)
-let gen_tagged_binop fmap op lhs rhs =
-  let left = gen_im_expr_ir fmap lhs in
-  let right = gen_im_expr_ir fmap rhs in
+let gen_tagged_binop fmap env op lhs rhs =
+  let left = gen_im_expr_ir fmap env lhs in
+  let right = gen_im_expr_ir fmap env rhs in
   let one = Llvm.const_int i64_type 1 in
-  (* let build_oper, name = *)
   match op with
   | "+" ->
-    (* Llvm.build_add, "addtmp" *)
     let temp = Llvm.build_add left right "addtmp1" builder in
     Llvm.build_sub temp one "addtmp2" builder
   | "-" ->
@@ -192,8 +189,6 @@ let gen_tagged_binop fmap op lhs rhs =
     let temp1 = Llvm.build_add temp temp "divtmp4" builder in
     Llvm.build_add temp1 one "divtmp5" builder
   | "<" ->
-    (* if we don't extend, Llvm will generate store i1 instead of store i64
-      and this will lead to strange behaviour *)
     let temp = Llvm.build_icmp Llvm.Icmp.Slt left right "slttmp" builder in
     Llvm.build_zext temp i64_type "slttmp_as_i64" builder
   | "<=" ->
@@ -224,46 +219,42 @@ let build_apply_part fmap fclos args =
     args
 ;;
 
-let rec gen_comp_expr_ir fmap = function
-  | Comp_imm imm -> gen_im_expr_ir fmap imm
-  | Comp_binop (op, lhs, rhs) -> gen_tagged_binop fmap op lhs rhs
+let rec gen_comp_expr_ir fmap env = function
+  | Comp_imm imm -> gen_im_expr_ir fmap env imm
+  | Comp_binop (op, lhs, rhs) -> gen_tagged_binop fmap env op lhs rhs
   | Comp_app (Imm_ident f, args) ->
     let f_map = if f = "main" then subst_main else f in
-    (* Format.printf "Id: %s got called with %d args\n" f (List.length args); *)
     (match FuncMap.find fmap f_map with
      | Some (fval, ftype, _) ->
        let pvs = Llvm.params fval in
-       let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
+       let argvs = List.map (fun arg -> gen_im_expr_ir fmap env arg) args in
        if List.length args = Array.length pvs
-       then
-         build_call_mb_void ftype fval (Array.of_list argvs) "calltmp"
-         (* build_apply fmap fval argvs *)
+       then build_call_mb_void ftype fval (Array.of_list argvs) "calltmp"
        else (
          let fclos = build_alloc_closure fmap fval in
          build_apply_part fmap fclos argvs)
-     | _ ->
-       (* maybe it's a closure in this scope *)
-       (match Hashtbl.find_opt named_values f with
+     | None ->
+       (match ParamMap.find_opt f env with
         | Some clos_ptr ->
           let clos_val = Llvm.build_load i64_type clos_ptr (f ^ "_val") builder in
           Llvm.set_alignment gl_align clos_val;
-          let argvs = List.map (fun arg -> gen_im_expr_ir fmap arg) args in
+          let argvs = List.map (fun arg -> gen_im_expr_ir fmap env arg) args in
           build_apply_part fmap clos_val argvs
-        | _ -> invalid_arg ("Id: " ^ f ^ " not found")))
+        | None -> invalid_arg ("Id: " ^ f ^ " not found")))
   | Comp_app (Imm_num _, _) -> invalid_arg "cannot apply number as a function"
   | Comp_branch (cond, br_then, br_else) ->
-    let cv = gen_im_expr_ir fmap cond in
+    let cv = gen_im_expr_ir fmap env cond in
     let zero = Llvm.const_int i64_type 0 in
     let cond_val = Llvm.build_icmp Llvm.Icmp.Ne cv zero "cond" builder in
     let start_bb = Llvm.insertion_block builder in
     let the_fun = Llvm.block_parent start_bb in
     let then_bb = Llvm.append_block context "then" the_fun in
     Llvm.position_at_end then_bb builder;
-    let then_val = gen_anf_expr fmap br_then in
+    let then_val, _ = gen_anf_expr fmap env br_then in
     let new_then_bb = Llvm.insertion_block builder in
     let else_bb = Llvm.append_block context "else" the_fun in
     Llvm.position_at_end else_bb builder;
-    let else_val = gen_anf_expr fmap br_else in
+    let else_val, _ = gen_anf_expr fmap env br_else in
     let new_else_bb = Llvm.insertion_block builder in
     let merge_bb = Llvm.append_block context "ifcont" the_fun in
     Llvm.position_at_end merge_bb builder;
@@ -280,9 +271,7 @@ let rec gen_comp_expr_ir fmap = function
   | Comp_alloc imms | Comp_tuple imms ->
     let ctval, cttyp, _ = FuncMap.find_exn fmap "create_tuple_init" in
     let argc = Llvm.const_int i64_type (List.length imms) in
-    (* let ret = Llvm.build_call cttyp ctval [| argc |] "tuple_ret" builder in *)
-    (* let ptr = Llvm.build_inttoptr ret ptr_type "tuple_ptr" builder in *)
-    let argv = List.map (fun im -> gen_im_expr_ir fmap im) imms in
+    let argv = List.map (fun im -> gen_im_expr_ir fmap env im) imms in
     let alloca = Llvm.build_array_alloca i64_type argc "tuple_vals_alloca" builder in
     List.iteri
       (fun i elem ->
@@ -301,27 +290,27 @@ let rec gen_comp_expr_ir fmap = function
     let alloca_as_i64 = Llvm.build_pointercast alloca i64_type "alloca_as_i64" builder in
     Llvm.build_call cttyp ctval [| argc; alloca_as_i64 |] "tuple_tmp" builder
   | Comp_load (imexpr, offset) ->
-    (*addr of the tuple *)
-    let vbase = gen_im_expr_ir fmap imexpr in
+    let vbase = gen_im_expr_ir fmap env imexpr in
     let voffst = Llvm.const_int i64_type (offset / Target.word_size) in
     let fifn, fity, _ = FuncMap.find_exn fmap "field" in
     Llvm.build_call fity fifn [| vbase; voffst |] "load_tmp" builder
   | Comp_func (_, _) -> invalid_arg "anonymous functions should be lambda-lifted"
 
-and gen_anf_expr fmap = function
-  | Anf_comp_expr comp -> gen_comp_expr_ir fmap comp
+and gen_anf_expr fmap env = function
+  | Anf_comp_expr comp ->
+    let v = gen_comp_expr_ir fmap env comp in
+    v, env
   | Anf_let (_, name, comp_expr, body) ->
-    let init_val = gen_comp_expr_ir fmap comp_expr in
+    let init_val = gen_comp_expr_ir fmap env comp_expr in
     let the_fun = Llvm.block_parent (Llvm.insertion_block builder) in
     let alloca = create_entry_alloca the_fun name in
     let store = Llvm.build_store init_val alloca builder in
     Llvm.set_alignment gl_align store;
-    Hashtbl.add named_values name alloca;
-    gen_anf_expr fmap body
+    let new_env = ParamMap.add name alloca env in
+    gen_anf_expr fmap new_env body
 ;;
 
 let gen_function fmap the_mod name params body =
-  Hashtbl.clear named_values;
   let name = if name = "main" then subst_main else name in
   let param_types = Array.map (fun _ -> i64_type) (Array.of_list params) in
   let f_type = Llvm.function_type i64_type param_types in
@@ -337,25 +326,19 @@ let gen_function fmap the_mod name params body =
       else invalid_arg ("Redefinition of function with different number of args: " ^ name);
       f
   in
-  (* build allocas and add names for parameters *)
+  let bb = Llvm.append_block context "entry" the_fun in
+  Llvm.position_at_end bb builder;
+  let env = ref ParamMap.empty in
   Array.iteri
     (fun i pval ->
        let name = List.nth params i in
        Llvm.set_value_name name pval;
-       Hashtbl.add named_values name pval)
-    (Llvm.params the_fun);
-  let bb = Llvm.append_block context "entry" the_fun in
-  Llvm.position_at_end bb builder;
-  Array.iteri
-    (fun i ai ->
-       let name = List.nth params i in
        let alloca = create_entry_alloca the_fun name in
-       let store = Llvm.build_store ai alloca builder in
+       let store = Llvm.build_store pval alloca builder in
        Llvm.set_alignment gl_align store;
-       Hashtbl.replace named_values name alloca)
+       env := ParamMap.add name alloca !env)
     (Llvm.params the_fun);
-  (* Need to check for error here *)
-  let ret_val = gen_anf_expr fmap body in
+  let ret_val, _ = gen_anf_expr fmap !env body in
   let _ = Llvm.build_ret ret_val builder in
   if Llvm_analysis.verify_function the_fun
   then ()
@@ -367,23 +350,20 @@ let gen_function fmap the_mod name params body =
   the_fun
 ;;
 
-let gen_astructure_item fmap the_mod = function
-  | Anf_str_eval expr -> gen_anf_expr fmap expr
+let gen_astructure_item fmap the_mod main_fn env = function
+  | Anf_str_eval expr ->
+    let _, new_env = gen_anf_expr fmap env expr in
+    new_env
   | Anf_str_value (_, name, Anf_comp_expr (Comp_func (params, body))) ->
-    gen_function fmap the_mod name params body
+    let _ = gen_function fmap the_mod name params body in
+    env
   | Anf_str_value (_, name, expr) ->
-    let main_fn =
-      match Llvm.lookup_function "main" the_mod with
-      | Some fn -> fn
-      | _ -> invalid_arg ("cannot generate value: " ^ name ^ ", main function not found")
-    in
     Llvm.position_at_end (Llvm.entry_block main_fn) builder;
-    let value = gen_anf_expr fmap expr in
+    let value, _ = gen_anf_expr fmap env expr in
     let alloca = create_entry_alloca main_fn name in
-    Hashtbl.add named_values name alloca;
     let store = Llvm.build_store value alloca builder in
     Llvm.set_alignment gl_align store;
-    store
+    ParamMap.add name alloca env
 ;;
 
 let optimize_ir the_mod (triple : string) (opt : string option) =
@@ -408,7 +388,6 @@ let gen_program_ir (program : aprogram) (triple : string) (opt : string option) 
   Llvm.set_target_triple triple the_module;
   assert (Llvm_executionengine.initialize ());
   let fmap = prefill_fmap (initial_fmap the_module) the_module program in
-  (* FuncMap.print_fmap fmap; *)
   let main_ty = Llvm.function_type i64_type [||] in
   let main_fn = Llvm.define_function "main" main_ty the_module in
   Llvm.position_at_end (Llvm.entry_block main_fn) builder;
@@ -416,7 +395,13 @@ let gen_program_ir (program : aprogram) (triple : string) (opt : string option) 
   let _ =
     build_call_mb_void initty initfn [| Llvm.const_int i64_type (5 * 1024) |] "inittmp"
   in
-  let _ = List.map (gen_astructure_item fmap the_module) program in
+  let env = ParamMap.empty in
+  let _ =
+    List.fold_left
+      (fun env item -> gen_astructure_item fmap the_module main_fn env item)
+      env
+      program
+  in
   let bbs = Llvm.basic_blocks main_fn in
   Llvm.position_at_end bbs.(Array.length bbs - 1) builder;
   let col_fn, col_ty, _ = FuncMap.find_exn fmap "collect" in
