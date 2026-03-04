@@ -257,7 +257,7 @@ let%expect_test "fun 'a -> 'b (in env)" =
   [%expect{| 'a -> 's |}]
 
 
-let%expect_test _=
+let%expect_test {| fun x -> fun y -> x y |} =
   infer_exp_str {| fun x -> fun y -> x y |};
  [%expect{| ('b -> 'c) -> 'b -> 'c |}]
 
