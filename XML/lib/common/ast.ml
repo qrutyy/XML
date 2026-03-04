@@ -103,16 +103,16 @@ module TypeExpr = struct
   type level = int [@@deriving eq, show { with_path = false }, qcheck]
 
   type t =
-    | Type_arrow of t * t
-    | Type_tuple of t List2.t
-    | Type_var of tv ref
-    | Quant_type_var of ident
-    | Type_construct of ident * t list
+    | Type_arrow of t * t (** Function type [t1 -> t2] *)
+    | Type_tuple of t List2.t (** Tuple type [t1 * t2 * ...] *)
+    | Type_var of tv ref (** Type variable ['a] *)
+    | Quant_type_var of ident (** Quantified type variable ['a. 'a] *)
+    | Type_construct of ident * t list (** *)
   [@@deriving eq, show { with_path = false }, qcheck]
 
   and tv =
-    | Unbound of ident * level
-    | Link of t
+    | Unbound of ident * level (** Free type variable *)
+    | Link of t (** Unified type variable *)
   [@@deriving eq, show { with_path = false }, qcheck]
 end
 
