@@ -120,18 +120,51 @@ let%expect_test "print_int 5" =
     } |}]
 
 let%expect_test "if 1 then 1 else 2 " =
-  codegen_prog_str {| if true then 1 else 2 |};
-  [%expect.unreachable]
-[@@expect.uncaught_exn {|
-  (* CR expect_test_collector: This test expectation appears to contain a backtrace.
-     This is strongly discouraged as backtraces are fragile.
-     Please change this test to not include a backtrace. *)
+  codegen_prog_str {| if 1 then 1 else 2 |};
+  [%expect{|
+    ; ModuleID = 'main'
+    source_filename = "main"
+    target triple = "riscv64-unknown-linux-gnu"
 
-  (Invalid_argument "unsupported expression in ANF normaliser")
-  Raised at Stdlib.invalid_arg in file "stdlib.ml", line 30, characters 20-45
-  Called from XML_unittests__Codegen_llvm.codegen_prog_str in file "many_tests/unit/codegen_llvm.ml", line 8, characters 12-28
-  Called from XML_unittests__Codegen_llvm.(fun) in file "many_tests/unit/codegen_llvm.ml", line 119, characters 2-46
-  Called from Expect_test_collector.Make.Instance_io.exec in file "collector/expect_test_collector.ml", line 234, characters 12-19 |}]
+    declare void @print_int(i64)
+
+    declare i64 @alloc_block(i64)
+
+    declare i64 @alloc_closure(i64, i64)
+
+    declare i64 @apply1(i64, i64)
+
+    declare void @print_gc_status()
+
+    declare void @collect()
+
+    declare i64 @create_tuple(i64)
+
+    declare i64 @create_tuple_init(i64, i64)
+
+    declare i64 @field(i64, i64)
+
+    declare void @rt_init(i64)
+
+    define i64 @main() {
+    entry:
+      %t_0 = alloca i64, align 8
+      call void @rt_init(i64 5120)
+      br i1 true, label %then, label %else
+
+    then:                                             ; preds = %entry
+      br label %ifcont
+
+    else:                                             ; preds = %entry
+      br label %ifcont
+
+    ifcont:                                           ; preds = %else, %then
+      %iftmp = phi i64 [ 3, %then ], [ 5, %else ]
+      store i64 %iftmp, ptr %t_0, align 8
+      %t_01 = load i64, ptr %t_0, align 8
+      call void @collect()
+      ret i64 0
+    } |}]
 
 let%expect_test "tuple" =
   codegen_prog_str {| (1, 2, 3, 4) |};
