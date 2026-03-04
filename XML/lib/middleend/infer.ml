@@ -241,8 +241,7 @@ let add_rec_names env vb_list =
     vb_list
 ;;
 
-let rec get_pat_names acc pat =
-  match pat with
+let rec get_pat_names acc = function
   | Pat_var id -> id :: acc
   | Pat_tuple (pat1, pat2, rest) ->
     Base.List.fold_left ~f:get_pat_names ~init:acc (pat1 :: pat2 :: rest)

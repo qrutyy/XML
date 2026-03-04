@@ -97,7 +97,7 @@ end
 module TypeExpr = struct
   let gen_ref inner_gen =
     let open QCheck.Gen in
-    map (fun x -> ref x) inner_gen
+    map ref inner_gen
   ;;
 
   type level = int [@@deriving eq, show { with_path = false }, qcheck]
