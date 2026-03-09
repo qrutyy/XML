@@ -1,1 +1,1 @@
-forward mutability_check ignore bin/XML.ml,bin/XML_llvm.ml,lib/middleend/infer.ml,lib/common/ast.ml
+forward mutability_check physical_equality ignore bin/XML.ml,bin/XML_llvm.ml,lib/middleend/infer.ml,lib/common/ast.ml,lib/common/ast.mli,lib/common/pprinter.ml
