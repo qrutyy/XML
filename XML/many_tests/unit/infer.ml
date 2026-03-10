@@ -7,8 +7,6 @@ open Common.Parser
 open Common.Pprinter
 open Common.Ast.TypeExpr
 
-let (let*) = Result.bind
-
 let infer_exp_str ?(rst = true) ?(env = []) str =
   let exp = parse_exp_str str in
   if rst then reset_gensym ();
