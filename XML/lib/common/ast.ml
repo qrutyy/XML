@@ -1,6 +1,6 @@
 (** Copyright 2024,  Mikhail Gavrilenko, Danila Rudnev-Stepanyan, Daniel Vlasenko*)
 
-(** SPDX-License-(ident[@gen gen_ident])ifier: LGPL-3.0-or-later *)
+(** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 open QCheck
 open Base
