@@ -30,15 +30,6 @@ let is_not_keyword = function
   | _ -> true
 ;;
 
-let rec gen_filtered_ident base_gen =
-  let open QCheck.Gen in
-  base_gen
-  >>= fun (ident [@gen gen_ident]) ->
-  if is_not_keyword (ident [@gen gen_ident])
-  then return (ident [@gen gen_ident])
-  else gen_filtered_ident base_gen
-;;
-
 let gen_id_first_char = QCheck.Gen.oneof_weighted [ 5, char_range 'a' 'z'; 1, return '_' ]
 let gen_digit = char_range '0' '9'
 
@@ -58,33 +49,6 @@ let gen_ident =
     gen >>= fun name -> if is_not_keyword name then return name else loop gen
   in
   loop gen_name
-;;
-
-let gen_ident_uc =
-  let base_gen =
-    map2
-      (fun start_sym rest_sym -> Base.Char.to_string start_sym ^ rest_sym)
-      (char_range 'A' 'Z')
-      (string_small_of
-         (oneof
-            [ char_range 'A' 'Z'; char_range 'a' 'z'; char_range '0' '9'; return '_' ]))
-  in
-  gen_filtered_ident base_gen
-;;
-
-let gen_ident_lc include_us =
-  let start_sym =
-    if include_us then oneof [ char_range 'a' 'z'; return '_' ] else char_range 'a' 'z'
-  in
-  let base_gen =
-    map2
-      (fun start_sym rest_sym -> Base.Char.to_string start_sym ^ rest_sym)
-      start_sym
-      (string_small_of
-         (oneof
-            [ char_range 'A' 'Z'; char_range 'a' 'z'; char_range '0' '9'; return '_' ]))
-  in
-  gen_filtered_ident base_gen
 ;;
 
 module List1 = struct
@@ -373,23 +337,11 @@ module Structure = struct
           when [rec] is [Nonrecursive],
         - [let rec P1 = E1 and ... and Pn = EN ]
           when [rec] is [Recursiv e ee]. *)
-    | Str_adt of ident list * ident * (ident * TypeExpr.t option) List1.t
-    (** [Str_type(C0, [(C1, [(T11; T12; ... ; T1n_1)]); (C2, [(T21;T22; ... ; T2n_2)]); ... ;
-      (Cm, [(Tm1;Tm2; ... ; Tmn_n)]) ])] represents:
-
-        [type C0 =
-      | C1 of T11 * ... * T1n_1
-      | ...
-      | Cm of Tm1 * ... * Tmn_n
-      ]
-
-        n_i: [n_i >= 0]
-        Invariant: [m > 0] *)
   [@@deriving eq, show { with_path = false }]
 
   let gen_structure_item n =
     oneof_weighted
-      [ 0, map (fun expr -> Str_eval expr) (Expression.gen_sized (n / 2))
+      [ 1, map (fun expr -> Str_eval expr) (Expression.gen_sized (n / 2))
       ; ( 1
         , let* rec_flag =
             oneof [ return Expression.Nonrecursive; return Expression.Recursive ]
@@ -399,14 +351,6 @@ module Structure = struct
             list_small (Expression.gen_value_binding Expression.gen_sized (n / 2))
           in
           return (Str_value (rec_flag, (bind1, bindl))) )
-      ; ( 0
-        , let* tparam = list_small gen_ident in
-          let* idt = gen_ident in
-          let* cons1 = Gen.pair gen_ident (Gen.option (TypeExpr.gen_sized (n / 20))) in
-          let* consl =
-            list_small (Gen.pair gen_ident (Gen.option (TypeExpr.gen_sized (n / 20))))
-          in
-          return (Str_adt (tparam, idt, (cons1, consl))) )
       ]
   ;;
 

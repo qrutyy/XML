@@ -366,29 +366,6 @@ let pprint_structure_item fmt n =
              asprintf "%a" (fun fmt -> pprint_value_binding fmt n) vb))
     in
     fprintf fmt "let %a%s;;\n\n" pprint_rec rec_flag bindings_str
-  | Str_adt (tparam, id, (constr1, constrl)) ->
-    let tparam_ident_str =
-      match List.length tparam with
-      | 0 -> ""
-      | 1 -> asprintf "'%s " (List.hd_exn tparam)
-      | _ ->
-        "('"
-        ^ String.concat ~sep:", '" (List.map tparam ~f:(fun param -> asprintf "%s" param))
-        ^ ") "
-    in
-    let var_t_str =
-      match constr1 :: constrl with
-      | [] -> ""
-      | _ ->
-        "  | "
-        ^ String.concat
-            ~sep:"\n  | "
-            (List.map (constr1 :: constrl) ~f:(fun (id, typ) ->
-               match typ with
-               | Some t -> asprintf "%s of %a" id pprint_type t
-               | None -> asprintf "%s" id))
-    in
-    fprintf fmt "type %s%s =\n%s\n;;\n\n" tparam_ident_str id var_t_str
 ;;
 
 let pprint_program fmt = List.iter ~f:(pprint_structure_item fmt 0)

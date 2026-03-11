@@ -9,10 +9,7 @@ val pp_ident : Format.formatter -> ident -> unit
 val show_ident : ident -> string
 val gen_charc : char QCheck.Gen.t
 val is_not_keyword : string -> bool
-val gen_filtered_ident : string QCheck.Gen.t -> string QCheck.Gen.t
 val gen_ident : string QCheck.Gen.t
-val gen_ident_uc : string QCheck.Gen.t
-val gen_ident_lc : bool -> string QCheck.Gen.t
 
 module List1 : sig
   type 'a t = 'a * 'a list
@@ -179,9 +176,6 @@ module Structure : sig
           when [rec] is [rec_flag.Nonrecursive].
         - [let rec P1 = E1 and ... and Pn = En]
           when [rec] is [rec_flag.Recursive]. *)
-    | Str_adt of ident list * ident * (ident * TypeExpr.t option) List1.t
-    (** A type declaration for an algebraic data type (ADT),
-        such as [type t1 = ... | ... | tn = ...]. *)
 
   val equal_structure_item : structure_item -> structure_item -> bool
   val pp_structure_item : Format.formatter -> structure_item -> unit

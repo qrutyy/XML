@@ -282,7 +282,6 @@ let closure_structure_item_result toplvl_set = function
     (match new_bindings with
      | [] -> Error Empty_toplevel_let
      | hd :: tl -> Ok (Str_value (rec_flag, (hd, tl)), new_toplvl_set))
-  | Str_adt _ as item -> Ok (item, toplvl_set)
 ;;
 
 let closure_structure_item toplvl_set item =

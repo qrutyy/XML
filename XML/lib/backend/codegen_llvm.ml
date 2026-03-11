@@ -127,13 +127,6 @@ let prefill_fmap (fmap0 : FuncMap.t) the_mod (program : aprogram) : FuncMap.t =
     program
 ;;
 
-(* for debug *)
-let _print_untag fmap n =
-  let pival, pityp, _ = FuncMap.find_exn fmap "print_int" in
-  let _ = build_call_mb_void pityp pival [| n |] "_" in
-  ()
-;;
-
 let build_alloc_closure fmap func =
   let acval, actyp, _ = FuncMap.find_exn fmap "alloc_closure" in
   let argc = Array.length (Llvm.params func) in
@@ -182,12 +175,6 @@ let gen_tagged_binop fmap env op lhs rhs =
     let right' = Llvm.build_sub right one "multmp2" builder in
     let temp = Llvm.build_mul left' right' "multmp3" builder in
     Llvm.build_add temp one "multmp4" builder
-  | "/" ->
-    let left' = Llvm.build_lshr left one "divtmp1" builder in
-    let right' = Llvm.build_lshr right one "divtmp2" builder in
-    let temp = Llvm.build_sdiv left' right' "divtmp3" builder in
-    let temp1 = Llvm.build_add temp temp "divtmp4" builder in
-    Llvm.build_add temp1 one "divtmp5" builder
   | "<" ->
     let temp = Llvm.build_icmp Llvm.Icmp.Slt left right "slttmp" builder in
     Llvm.build_zext temp i64_type "slttmp_as_i64" builder

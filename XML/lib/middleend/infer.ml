@@ -19,7 +19,6 @@ type error =
   | Operator_not_found of string
   | Invalid_let_rec_rhs
   | Invalid_let_rec_lhs
-  | Not_supported of string
 
 let pprint_err ppf = function
   | Occurs_check -> Format.fprintf ppf "Occurs check"
@@ -37,7 +36,6 @@ let pprint_err ppf = function
       "This kind of expression is not allowed as right-hand side of `let rec'"
   | Invalid_let_rec_lhs ->
     Format.fprintf ppf "Only variables are allowed as left-hand side of `let rec'"
-  | Not_supported string -> Format.fprintf ppf "Not supported: %s" string
 ;;
 
 type 'a t = ('a, error) result
@@ -470,7 +468,6 @@ let infer_structure_item env = function
         (vb :: vbs)
     in
     return (new_env1, new_names)
-  | Str_adt _ -> fail (Not_supported "str_adts")
 ;;
 
 let infer_program env prog =

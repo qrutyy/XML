@@ -262,7 +262,6 @@ let norm_item (item : structure_item) (st : nstate) : (astructure_item * nstate)
        let* body_anf, st' = norm_body expr st in
        ok (Anf_str_value (rec_flag, name, body_anf), st')
      | _ -> err `Unsupported_toplevel_let)
-  | _ -> err `Unsupported_toplevel_item
 ;;
 
 let anf_program_res (program : structure_item list) : (aprogram, anf_error) result =

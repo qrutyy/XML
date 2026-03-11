@@ -564,55 +564,7 @@ let pstrlet =
   return (Structure.Str_value (recflag, (bindingfs, bindingtl)))
 ;;
 
-let pstradt =
-  let* _ = token "type" in
-  let* type_param =
-    option
-      []
-      (pparenth (sep_by (token ",") (token "'" *> pident_lc))
-       <|> many (token "'" *> pident_lc))
-  in
-  let* type_name = pass_ws *> pident_lc in
-  let var =
-    let* name = option None (pass_ws *> pident_cap >>= fun n -> return (Some n)) in
-    match name with
-    | Some x ->
-      (* Constructor case: Can have "of" *)
-      let* ctype =
-        option
-          None
-          (token "of"
-           *> let* types = sep_by (token "*") ptype_adt in
-              match types with
-              | x :: y :: xs -> return (Some (TypeExpr.Type_tuple (x, y, xs)))
-              | [ x ] -> return (Some x)
-              | [] -> fail "Expected type after 'of'")
-      in
-      return (x, ctype)
-    | None ->
-      (* Lowercase type alias case: Must have a type expression *)
-      let* ctype =
-        let* types = sep_by (token "*") ptype_adt in
-        match types with
-        | x :: y :: xs -> return (Some (TypeExpr.Type_tuple (x, y, xs))) (* Tuple case *)
-        | [ x ] -> return (Some x) (* Single type *)
-        | [] -> fail "Expected type definition"
-      in
-      return ("", ctype)
-  in
-  let* _ = token "=" in
-  let* fvar =
-    option
-      None
-      (option None (token "|" *> return None) *> (var >>= fun v -> return (Some v)))
-  in
-  let* varl = many (token "|" *> var) in
-  match fvar with
-  | Some fvar -> return (Structure.Str_adt (type_param, type_name, (fvar, varl)))
-  | None -> fail "Expected at least one variant"
-;;
-
-let pstr_item = pseval <|> pstrlet <|> pstradt
+let pstr_item = pseval <|> pstrlet
 
 let pstructure =
   let psemicolon = many (token ";;") in
