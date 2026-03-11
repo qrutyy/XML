@@ -54,6 +54,6 @@ let () =
     ; "-stop", Arg.Unit (fun _ -> exit 0), " Exit"
     ; "-gen", Arg.Int run_tests, " Exit"
     ]
-    (fun _ -> print_endline "" )
+    (fun _ ->  ())
     "help"
 ;;

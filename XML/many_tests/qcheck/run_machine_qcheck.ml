@@ -31,6 +31,6 @@ let () =
     ; "-stop", Arg.Unit (fun _ -> exit 0), " Exit"
     ; "-gen", Arg.Int run_tests, " Exit"
     ]
-    (fun _ -> assert false)
+    (fun _ -> ())
     "help"
 ;;
