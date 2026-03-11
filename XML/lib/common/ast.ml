@@ -88,21 +88,46 @@ let gen_ident_lc include_us =
 ;;
 
 module List1 = struct
-  type 'a t = 'a * ('a list[@gen list_size (int_bound 5) gen_a])
-  [@@deriving eq, show { with_path = false }, qcheck]
+  type 'a t = 'a * 'a list [@@deriving eq, show { with_path = false }]
+
+  let gen gen_a =
+    QCheck.Gen.map
+      (fun (gen0, gen1) -> gen0, gen1)
+      (QCheck.Gen.pair gen_a (list_size (int_bound 5) gen_a))
+  ;;
+
+  let arb gen_a = QCheck.make @@ gen gen_a
 end
 
 module List2 = struct
-  type 'a t = 'a * 'a * ('a list[@gen list_size (int_bound 5) gen_a])
-  [@@deriving eq, show { with_path = false }, qcheck]
+  type 'a t = 'a * 'a * 'a list [@@deriving eq, show { with_path = false }]
+
+  let gen gen_a =
+    QCheck.Gen.map
+      (fun (gen0, gen1, gen2) -> gen0, gen1, gen2)
+      (QCheck.Gen.triple gen_a gen_a (QCheck.Gen.list gen_a))
+  ;;
+
+  let _ = gen
+  let arb gen_a = QCheck.make @@ gen gen_a
 end
 
 module Constant = struct
   type t =
-    | Const_integer of (int[@gen nat_small]) (** integer as [52] *)
-    | Const_char of (char[@gen gen_charc]) (** char as ['w'] *)
-    | Const_string of (string[@gen string_small_of gen_charc]) (** string as ["Kakadu"] *)
-  [@@deriving eq, show { with_path = false }, qcheck]
+    | Const_integer of int (** integer as [52] *)
+    | Const_char of char (** char as ['w'] *)
+    | Const_string of string (** string as ["Kakadu"] *)
+  [@@deriving eq, show { with_path = false }]
+
+  let gen =
+    QCheck.Gen.oneof_weighted
+      [ 1, QCheck.Gen.map (fun gen0 -> Const_integer gen0) nat_small
+      ; 1, QCheck.Gen.map (fun gen0 -> Const_char gen0) gen_charc
+      ; 1, QCheck.Gen.map (fun gen0 -> Const_string gen0) (string_small_of gen_charc)
+      ]
+  ;;
+
+  let arb = QCheck.make @@ gen
 end
 
 module TypeExpr = struct
@@ -114,42 +139,117 @@ module TypeExpr = struct
   type level = (int[@gen nat_small]) [@@deriving eq, show { with_path = false }, qcheck]
 
   type t =
-    | Type_arrow of (t[@gen gen_sized (n / 2)]) * (t[@gen gen_sized (n / 2)])
-    (** Function type [t1 -> t2] *)
+    | Type_arrow of t * t (** Function type [t1 -> t2] *)
     | Type_tuple of t List2.t (** Tuple type [t1 * t2 * ...] *)
     | Type_var of tv ref (** Type variable ['a] *)
-    | Quant_type_var of (ident[@gen gen_ident]) (** Quantified type variable ['a. 'a] *)
-    | Type_construct of (ident[@gen gen_ident]) * t list (** *)
-  [@@deriving eq, show { with_path = false }, qcheck]
+    | Quant_type_var of ident (** Quantified type variable ['a. 'a] *)
+    | Type_construct of ident * t list (** *)
+  [@@deriving eq, show { with_path = false }]
 
   and tv =
     | Unbound of (ident[@gen gen_ident]) * level (** Free type variable *)
     | Link of (t[@gen gen_sized (n / 2)]) (** Unified type variable *)
-  [@@deriving eq, show { with_path = false }, qcheck]
+  [@@deriving eq, show { with_path = false }]
+
+  let rec gen_sized n =
+    match n with
+    | 0 -> QCheck.Gen.map (fun gen0 -> Quant_type_var gen0) gen_ident
+    | _ ->
+      QCheck.Gen.oneof_weighted
+        [ 1, QCheck.Gen.map (fun gen0 -> Quant_type_var gen0) gen_ident
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1) -> Type_arrow (gen0, gen1))
+              (QCheck.Gen.pair (gen_sized (n / 2)) (gen_sized (n / 2))) )
+        ; 1, QCheck.Gen.map (fun gen0 -> Type_tuple gen0) (List2.gen (gen_sized (n / 2)))
+        ; 1, QCheck.Gen.map (fun gen0 -> Type_var gen0) (gen_ref (gen_tv_sized (n / 2)))
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1) -> Type_construct (gen0, gen1))
+              (QCheck.Gen.pair gen_ident (QCheck.Gen.list (gen_sized (n / 2)))) )
+        ]
+
+  and gen_tv_sized n =
+    match n with
+    | 0 ->
+      QCheck.Gen.map
+        (fun (gen0, gen1) -> Unbound (gen0, gen1))
+        (QCheck.Gen.pair gen_ident gen_level)
+    | _ ->
+      QCheck.Gen.oneof_weighted
+        [ ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1) -> Unbound (gen0, gen1))
+              (QCheck.Gen.pair gen_ident gen_level) )
+        ; 1, QCheck.Gen.map (fun gen0 -> Link gen0) (gen_sized (n / 2))
+        ]
+  ;;
+
+  let gen = QCheck.Gen.sized gen_sized
+  let gen_tv = QCheck.Gen.sized gen_tv_sized
+  let arb_sized n = QCheck.make @@ gen_sized n
+  let arb_tv_sized n = QCheck.make @@ gen_tv_sized n
+  let arb = QCheck.make @@ gen
+  let arb_tv = QCheck.make @@ gen_tv
 end
 
 module Pattern = struct
   type t =
-    | Pat_constraint of t * (TypeExpr.t[@gen TypeExpr.gen_sized (n / 2)])
-    (** Pattern [(P : T)] *)
+    | Pat_constraint of t * TypeExpr.t (** Pattern [(P : T)] *)
     | Pat_any (** The pattern [_]. *)
-    | Pat_var of (ident[@gen gen_ident]) (** A variable pattern such as [x] *)
+    | Pat_var of ident (** A variable pattern such as [x] *)
     | Pat_constant of Constant.t (** Patterns such as [52], ['w'], ["uwu"] *)
     | Pat_tuple of t List2.t (** Patterns [(P1, ..., Pn)]. *)
-    | Pat_construct of (ident[@gen gen_ident]) * t option
+    | Pat_construct of ident * t option
     (** [Pat_construct(C, args)] represents:
         - [C]               when [args] is [None],
         - [C P]             when [args] is [Some (P)]
         - [C (P1, ..., Pn)] when [args] is
           [Some (Pat_tuple [P1; ...; Pn])] *)
-  [@@deriving eq, show { with_path = false }, qcheck]
+  [@@deriving eq, show { with_path = false }]
+
+  let rec gen_sized n =
+    match n with
+    | 0 ->
+      QCheck.Gen.oneof_weighted
+        [ 1, QCheck.Gen.pure Pat_any
+        ; 1, QCheck.Gen.map (fun gen0 -> Pat_var gen0) gen_ident
+        ; 1, QCheck.Gen.map (fun gen0 -> Pat_constant gen0) Constant.gen
+        ]
+    | _ ->
+      QCheck.Gen.oneof_weighted
+        [ 1, QCheck.Gen.pure Pat_any
+        ; 1, QCheck.Gen.map (fun gen0 -> Pat_var gen0) gen_ident
+        ; 1, QCheck.Gen.map (fun gen0 -> Pat_constant gen0) Constant.gen
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1) -> Pat_constraint (gen0, gen1))
+              (QCheck.Gen.pair (gen_sized (n / 2)) (TypeExpr.gen_sized (n / 2))) )
+        ; 1, QCheck.Gen.map (fun gen0 -> Pat_tuple gen0) (List2.gen (gen_sized (n / 2)))
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1) -> Pat_construct (gen0, gen1))
+              (QCheck.Gen.pair gen_ident (QCheck.Gen.option (gen_sized (n / 2)))) )
+        ]
+  ;;
+
+  let gen = QCheck.Gen.sized gen_sized
+  let arb_sized n = QCheck.make @@ gen_sized n
+  let arb = QCheck.make @@ gen
 end
 
 module Expression = struct
   type rec_flag =
     | Nonrecursive
     | Recursive
-  [@@deriving eq, show { with_path = false }, qcheck]
+  [@@deriving eq, show { with_path = false }]
+
+  let gen_rec_flag =
+    QCheck.Gen.oneof_weighted
+      [ 1, QCheck.Gen.pure Nonrecursive; 1, QCheck.Gen.pure Recursive ]
+  ;;
+
+  let arb_rec_flag = QCheck.make @@ gen_rec_flag
 
   type 'expr value_binding =
     { pat : Pattern.t
@@ -175,36 +275,94 @@ module Expression = struct
   ;;
 
   type t =
-    | Exp_ident of (ident[@gen gen_ident])
-    (** (ident[@gen gen_ident])ifiers such as [x] *)
+    | Exp_ident of ident (** (ident[@gen gen_ident])ifiers such as [x] *)
     | Exp_constant of Constant.t (** Expressions constant such as [1], ['a'], ["true"]**)
     | Exp_tuple of t List2.t (** Expressions [(E1, E2, ..., En)] *)
-    | Exp_function of (t case[@gen gen_case gen_sized (n / 2)]) List1.t
+    | Exp_function of t case List1.t
     (** [Exp_function (P1, [P2; ...; Pn])] represents
         [function P1 | ... | Pn] *)
-    | Exp_fun of (Pattern.t[@gen Pattern.gen_sized (n / 2)]) List1.t * t
+    | Exp_fun of Pattern.t List1.t * t
     (**[Exp_fun (P1, [P2; ...; Pn], E)] represents:
        [fun P1 ... Pn -> E] *)
     | Exp_apply of t * t
     (** [Pexp_apply(E0, E1)]
                              represents [E0 E1]*)
-    | Exp_match of t * (t case[@gen gen_case gen_sized (n / 2)]) List1.t
-    (** [match E0 with P1 -> E1 || Pn -> En] *)
-    | Exp_constraint of t * (TypeExpr.t[@gen TypeExpr.gen_sized (n / 2)]) (** [(E : T)] *)
+    | Exp_match of t * t case List1.t (** [match E0 with P1 -> E1 || Pn -> En] *)
+    | Exp_constraint of t * TypeExpr.t (** [(E : T)] *)
     | Exp_if of t * t * t option (** [if E1 then E2 else E3] *)
-    | Exp_let of
-        rec_flag * (t value_binding[@gen gen_value_binding gen_sized (n / 2)]) List1.t * t
+    | Exp_let of rec_flag * t value_binding List1.t * t
     (** [Exp_let(flag, [(P1,E1) ; ... ; (Pn,En)], E)] represents:
         - [let P1 = E1 and ... and Pn = EN in E]
           when [flag] is [Nonrecursive],
         - [let rec P1 = E1 and ... and Pn = EN in E]
           when [flag] is [Recursive]. *)
-    | Exp_construct of (ident[@gen gen_ident]) * t option
+    | Exp_construct of ident * t option
     (** [Exp_construct(C, exp)] represents:
         - [C]               when [exp] is [None],
         - [C E]             when [exp] is [Some E],
         - [C (E1, ..., En)] when [exp] is [Some (Exp_tuple[E1;...;En])] *)
-  [@@deriving eq, show { with_path = false }, qcheck]
+  [@@deriving eq, show { with_path = false }]
+
+  let rec gen_sized n =
+    match n with
+    | 0 ->
+      QCheck.Gen.oneof_weighted
+        [ 1, QCheck.Gen.map (fun gen0 -> Exp_ident gen0) gen_ident
+        ; 1, QCheck.Gen.map (fun gen0 -> Exp_constant gen0) Constant.gen
+        ]
+    | _ ->
+      QCheck.Gen.oneof_weighted
+        [ 1, QCheck.Gen.map (fun gen0 -> Exp_ident gen0) gen_ident
+        ; 1, QCheck.Gen.map (fun gen0 -> Exp_constant gen0) Constant.gen
+        ; 1, QCheck.Gen.map (fun gen0 -> Exp_tuple gen0) (List2.gen (gen_sized (n / 2)))
+        ; ( 1
+          , QCheck.Gen.map
+              (fun gen0 -> Exp_function gen0)
+              (List1.gen (gen_case gen_sized (n / 2))) )
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1) -> Exp_fun (gen0, gen1))
+              (QCheck.Gen.pair
+                 (List1.gen (Pattern.gen_sized (n / 2)))
+                 (gen_sized (n / 2))) )
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1) -> Exp_apply (gen0, gen1))
+              (QCheck.Gen.pair (gen_sized (n / 2)) (gen_sized (n / 2))) )
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1) -> Exp_match (gen0, gen1))
+              (QCheck.Gen.pair
+                 (gen_sized (n / 2))
+                 (List1.gen (gen_case gen_sized (n / 2)))) )
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1) -> Exp_constraint (gen0, gen1))
+              (QCheck.Gen.pair (gen_sized (n / 2)) (TypeExpr.gen_sized (n / 2))) )
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1, gen2) -> Exp_if (gen0, gen1, gen2))
+              (QCheck.Gen.triple
+                 (gen_sized (n / 2))
+                 (gen_sized (n / 2))
+                 (QCheck.Gen.option (gen_sized (n / 2)))) )
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1, gen2) -> Exp_let (gen0, gen1, gen2))
+              (QCheck.Gen.triple
+                 gen_rec_flag
+                 (List1.gen (gen_value_binding gen_sized (n / 2)))
+                 (gen_sized (n / 2))) )
+        ; ( 1
+          , QCheck.Gen.map
+              (fun (gen0, gen1) -> Exp_construct (gen0, gen1))
+              (QCheck.Gen.pair gen_ident (QCheck.Gen.option (gen_sized (n / 2)))) )
+        ]
+  ;;
+
+  let gen = QCheck.Gen.sized gen_sized
+  let arb_sized n = QCheck.make @@ gen_sized n
+  let arb = QCheck.make @@ gen
 end
 
 module Structure = struct
@@ -216,10 +374,7 @@ module Structure = struct
           when [rec] is [Nonrecursive],
         - [let rec P1 = E1 and ... and Pn = EN ]
           when [rec] is [Recursiv e ee]. *)
-    | Str_adt of
-        (ident[@gen gen_ident]) list
-        * (ident[@gen gen_ident])
-        * ((ident[@gen gen_ident]) * TypeExpr.t option) List1.t
+    | Str_adt of ident list * ident * (ident * TypeExpr.t option) List1.t
     (** [Str_type(C0, [(C1, [(T11; T12; ... ; T1n_1)]); (C2, [(T21;T22; ... ; T2n_2)]); ... ;
       (Cm, [(Tm1;Tm2; ... ; Tmn_n)]) ])] represents:
 
@@ -255,6 +410,8 @@ module Structure = struct
           return (Str_adt (tparam, idt, (cons1, consl))) )
       ]
   ;;
+
+  let arb_structure_item = QCheck.make @@ gen_structure_item 10
 end
 
 type program = Structure.structure_item list [@@deriving eq, show { with_path = false }]

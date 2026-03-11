@@ -22,7 +22,13 @@ let gen_reg =
     ]
 ;;
 
-type offset = reg * (int[@gen QCheck.Gen.nat_small]) [@@deriving eq, qcheck]
+type offset = reg * (int[@gen QCheck.Gen.nat_small]) [@@deriving eq]
+
+let gen_offset =
+  QCheck.Gen.map
+    (fun (gen0, gen1) -> gen0, gen1)
+    (QCheck.Gen.pair gen_reg QCheck.Gen.nat_small)
+;;
 
 let pp_reg ppf =
   let open Format in
@@ -67,7 +73,98 @@ type instr =
     (* Load Address of labeled function into the reg *)
   | Slli of reg * reg * (int[@gen QCheck.Gen.nat_small]) (* << imm *)
   | Srai of reg * reg * (int[@gen QCheck.Gen.nat_small]) (* >> imm *)
-[@@deriving eq, qcheck]
+[@@deriving eq]
+
+let gen_instr =
+  QCheck.Gen.oneof_weighted
+    [ ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Addi (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg QCheck.Gen.nat_small) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Add (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg gen_reg) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Sub (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg gen_reg) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Mul (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg gen_reg) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Slt (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg gen_reg) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1) -> Seqz (gen0, gen1))
+          (QCheck.Gen.pair gen_reg gen_reg) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1) -> Snez (gen0, gen1))
+          (QCheck.Gen.pair gen_reg gen_reg) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Xor (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg gen_reg) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Xori (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg QCheck.Gen.nat_small) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Beq (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg gen_label) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Blt (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg gen_label) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Ble (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg gen_label) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1) -> Lla (gen0, gen1))
+          (QCheck.Gen.pair gen_reg gen_label) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1) -> Li (gen0, gen1))
+          (QCheck.Gen.pair gen_reg QCheck.Gen.nat_small) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1) -> Ld (gen0, gen1))
+          (QCheck.Gen.pair gen_reg gen_offset) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1) -> Sd (gen0, gen1))
+          (QCheck.Gen.pair gen_reg gen_offset) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1) -> Mv (gen0, gen1))
+          (QCheck.Gen.pair gen_reg gen_reg) )
+    ; 1, QCheck.Gen.map (fun gen0 -> Comment gen0) gen_comm
+    ; 1, QCheck.Gen.map (fun gen0 -> Label gen0) gen_label
+    ; 1, QCheck.Gen.map (fun gen0 -> Call gen0) gen_label
+    ; 1, QCheck.Gen.map (fun gen0 -> J gen0) gen_label
+    ; 1, QCheck.Gen.pure Ecall
+    ; 1, QCheck.Gen.pure Ret
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1) -> La (gen0, gen1))
+          (QCheck.Gen.pair gen_reg gen_label) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Slli (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg QCheck.Gen.nat_small) )
+    ; ( 1
+      , QCheck.Gen.map
+          (fun (gen0, gen1, gen2) -> Srai (gen0, gen1, gen2))
+          (QCheck.Gen.triple gen_reg gen_reg QCheck.Gen.nat_small) )
+    ]
+;;
 
 let pp_instr ppf =
   let open Format in
