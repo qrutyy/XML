@@ -83,7 +83,7 @@ to_cc {|
 [%expect {|
   let tuples = (let (a, b) = (10, 20) in (let to_tuple = ((fun a b x -> (x, a, b)) a) b in (to_tuple a) b));; |}]
 
-  
+
 let%expect_test "func" =
 to_cc {|
   let f x y =
@@ -92,7 +92,7 @@ to_cc {|
 [%expect {|
   let f = (fun x y -> (((fun y x -> ((fun y x -> y) y)) y) x) x);; |}]
 
-    
+
 let%expect_test "load" =
 to_cc {|
   let f x =
@@ -101,5 +101,22 @@ to_cc {|
       a in g
 |};
 [%expect{| let f = (fun x -> (let g = ((fun x y -> (let (a, b) = (x, y) in a)) x) in (g x)));; |}]
+
+
+let%expect_test "match" =
+to_cc {|
+  let f x =
+    let y = 10 in
+    let g z =
+      (match x with
+      | Some _ -> y
+      | _ -> z)
+    in
+    g
+|};
+[%expect{|
+  let f = (fun x -> (let y = 10 in (let g = ((fun x y z -> (match x with
+    | Some _ -> y
+    | _ -> z)) x) y in (g x) y)));; |}]
 
   
