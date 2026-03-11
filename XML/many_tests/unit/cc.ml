@@ -2,10 +2,7 @@
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
-open Middleend.Anf
-open Middleend.Pprinter
 open Middleend.Cc
-open Middleend.Ll
 open Common.Parser
 open Common.Pprinter
 
