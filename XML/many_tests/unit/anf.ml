@@ -14,6 +14,8 @@ let to_anf_prog str =
   print_anf_program Format.std_formatter aprog
   | Error e -> Format.fprintf Format.std_formatter "%s" (pp_anf_error e)
 
+  let pp_error e =
+    Format.fprintf Format.std_formatter "%s" (pp_anf_error e)
 
 (************************** Expressions **************************)
 
@@ -118,3 +120,48 @@ let%expect_test "factorial" =
                                                                         let t_3 = (n * t_2)
                                                                         in t_3
                                             in t_4 in t_5;; |}]
+
+(**************************  Error **************************)
+
+let%expect_test "Only_simple_var_params" =
+pp_error `Only_simple_var_params;
+[%expect {| Only simple variable patterns are allowed in function parameters |}]
+
+let%expect_test "Func_no_params" =
+pp_error `Func_no_params;
+[%expect {| Function with no parameters found |}]
+
+
+let%expect_test "Let_and_not_supported" =
+pp_error `Let_and_not_supported;
+[%expect {| let ... and ... is not supported in ANF yet |}]
+
+
+let%expect_test "Unsupported_let_pattern" =
+pp_error (`Unsupported_let_pattern "pattern");
+[%expect {| Unsupported pattern in let-binding: pattern |}]
+
+
+let%expect_test "Unsupported_let_pattern" =
+pp_error (`Unsupported_let_pattern "wrong_pattern");
+[%expect {| Unsupported pattern in let-binding: wrong_pattern |}]
+
+
+let%expect_test "Unsupported_expr_in_normaliser" =
+pp_error (`Unsupported_expr_in_normaliser);
+[%expect {| unsupported expression in ANF normaliser |}]
+
+let%expect_test "Mutual_rec_not_supported" =
+pp_error `Mutual_rec_not_supported;
+[%expect {| Mutually recursive let ... and ... bindings are not supported yet. |}]
+
+
+let%expect_test "Unsupported_toplevel_let" =
+pp_error `Unsupported_toplevel_let;
+[%expect {| Unsupported pattern in a top-level let-binding. Only simple variables are allowed. |}]
+
+
+let%expect_test "Unsupported_toplevel_item" =
+pp_error `Unsupported_toplevel_item;
+[%expect {| Unsupported top-level structure item. |}]
+
