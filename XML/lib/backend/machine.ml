@@ -9,9 +9,20 @@ type reg =
   | RA
   | SP
   | Zero
-[@@deriving eq]
+[@@deriving eq, qcheck]
 
-type offset = reg * int [@@deriving eq]
+let gen_reg =
+  QCheck.Gen.oneof_weighted
+    [ 1, QCheck.Gen.map (fun gen0 -> A gen0) QCheck.Gen.(0 -- 7)
+    ; 1, QCheck.Gen.map (fun gen0 -> T gen0) QCheck.Gen.(0 -- 6)
+    ; 1, QCheck.Gen.map (fun gen0 -> S gen0) QCheck.Gen.(0 -- 11)
+    ; 1, QCheck.Gen.pure RA
+    ; 1, QCheck.Gen.pure SP
+    ; 1, QCheck.Gen.pure Zero
+    ]
+;;
+
+type offset = reg * (int[@gen QCheck.Gen.nat_small]) [@@deriving eq, qcheck]
 
 let pp_reg ppf =
   let open Format in
@@ -25,9 +36,11 @@ let pp_reg ppf =
 ;;
 
 let pp_offset ppf (reg, off) = Format.fprintf ppf "%d(%a)" off pp_reg reg
+let gen_label = QCheck.Gen.return "label"
+let gen_comm = QCheck.Gen.return "comment"
 
 type instr =
-  | Addi of reg * reg * int (* ADD immediate *)
+  | Addi of reg * reg * (int[@gen QCheck.Gen.nat_small]) (* ADD immediate *)
   | Add of reg * reg * reg (* ADD *)
   | Sub of reg * reg * reg (* SUB *)
   | Mul of reg * reg * reg (* MUL *)
@@ -35,25 +48,26 @@ type instr =
   | Seqz of reg * reg (* SEQZ: set equal zero *)
   | Snez of reg * reg (* SNEZ: set not equal zero *)
   | Xor of reg * reg * reg (* XOR *)
-  | Xori of reg * reg * int (* XOR immediate *)
-  | Beq of reg * reg * string (* BEQ: branch if equal *)
-  | Blt of reg * reg * string (* BLT: branch if less than *)
-  | Ble of reg * reg * string (* BLE: branch if less or equal *)
-  | Lla of reg * string (* LLA: load address *)
-  | Li of reg * int (* LI: load immediate *)
+  | Xori of reg * reg * (int[@gen QCheck.Gen.nat_small]) (* XOR immediate *)
+  | Beq of reg * reg * (string[@gen gen_label]) (* BEQ: branch if equal *)
+  | Blt of reg * reg * (string[@gen gen_label]) (* BLT: branch if less than *)
+  | Ble of reg * reg * (string[@gen gen_label]) (* BLE: branch if less or equal *)
+  | Lla of reg * (string[@gen gen_label]) (* LLA: load address *)
+  | Li of reg * (int[@gen QCheck.Gen.nat_small]) (* LI: load immediate *)
   | Ld of reg * offset (* LD: load doubleword *)
   | Sd of reg * offset (* SD: store doubleword *)
   | Mv of reg * reg (* MV: move *)
-  | Comment of string (* Assembler comment *)
-  | Label of string (* Assembler label *)
-  | Call of string (* CALL *)
-  | J of string (* J: jump *)
+  | Comment of (string[@gen gen_comm]) (* Assembler comment *)
+  | Label of (string[@gen gen_label]) (* Assembler label *)
+  | Call of (string[@gen gen_label]) (* CALL *)
+  | J of (string[@gen gen_label]) (* J: jump *)
   | Ecall (* ECALL *)
   | Ret (* return *)
-  | La of reg * string (* Load Address of labeled function into the reg *)
-  | Slli of reg * reg * int (* << imm *)
-  | Srai of reg * reg * int (* >> imm *)
-[@@deriving eq]
+  | La of reg * (string[@gen gen_label])
+    (* Load Address of labeled function into the reg *)
+  | Slli of reg * reg * (int[@gen QCheck.Gen.nat_small]) (* << imm *)
+  | Srai of reg * reg * (int[@gen QCheck.Gen.nat_small]) (* >> imm *)
+[@@deriving eq, qcheck]
 
 let pp_instr ppf =
   let open Format in
