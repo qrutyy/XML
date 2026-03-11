@@ -48,7 +48,7 @@ let gen_id_char =
 
 let gen_ident =
   let gen_name =
-    let* fst = gen_id_first_char >|= fun c -> Base.Char.to_string c in
+    let* fst = gen_id_first_char >|= Base.Char.to_string in
     let range = if Base.String.( = ) fst "_" then 1 -- 4 else 0 -- 4 in
     let* rest = string_size ~gen:gen_id_char range in
     return (fst ^ rest)

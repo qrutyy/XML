@@ -1,5 +1,5 @@
-  $ ./run_machine_qcheck.exe -gen 40
-   seed: 410641225
+  $ ./run_machine_qcheck.exe -seed 410641225 -gen 40
+  random seed: 410641225
   srai a7, s4, 0
   srai s10, a4, 2
   la zero, label

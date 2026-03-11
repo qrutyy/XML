@@ -4,7 +4,6 @@
 
 open Common.Pprinter
 open Common.Ast
-open Common.Ast.Program
 open Common.Parser
 open Format
 
@@ -55,6 +54,6 @@ let () =
     ; "-stop", Arg.Unit (fun _ -> exit 0), " Exit"
     ; "-gen", Arg.Int run_tests, " Exit"
     ]
-    (fun _ -> assert false)
+    (fun _ -> print_endline "" )
     "help"
 ;;
