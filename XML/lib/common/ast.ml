@@ -39,11 +39,12 @@ let rec gen_filtered_ident base_gen =
   else gen_filtered_ident base_gen
 ;;
 
-let gen_id_first_char = frequency [ 5, char_range 'a' 'z'; 1, return '_' ]
+let gen_id_first_char = QCheck.Gen.oneof_weighted [ 5, char_range 'a' 'z'; 1, return '_' ]
 let gen_digit = char_range '0' '9'
 
 let gen_id_char =
-  frequency [ 5, gen_id_first_char; 5, char_range 'A' 'Z'; 5, gen_digit; 1, return '\'' ]
+  QCheck.Gen.oneof_weighted
+    [ 5, gen_id_first_char; 5, char_range 'A' 'Z'; 5, gen_digit; 1, return '\'' ]
 ;;
 
 let gen_ident =

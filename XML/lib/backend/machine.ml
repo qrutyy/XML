@@ -9,7 +9,7 @@ type reg =
   | RA
   | SP
   | Zero
-[@@deriving eq, qcheck]
+[@@deriving eq]
 
 let gen_reg =
   QCheck.Gen.oneof_weighted

@@ -34,7 +34,7 @@ let infer_prog_str ?(env = env_with_things) str =
 let show_etyp env exp =
   match infer_exp env exp with
   | Ok (_, ty) ->
-  Base.print_endline (Common.Ast.TypeExpr.show ty)
+  Stdio.print_endline (Common.Ast.TypeExpr.show ty)
   | Error err -> pprint_err Format.std_formatter err
 
 let type_bool = Type_construct ("bool", [])

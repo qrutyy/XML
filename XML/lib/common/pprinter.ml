@@ -71,7 +71,7 @@ let rearr_typvars typ =
            then String.make 1 (Char.of_int_exn (97 + idx))
            else (
              let prefix_count = (idx / 26) - 1 in
-             let suffix_idx = idx mod 26 in
+             let suffix_idx = Int.rem idx 26 in
              "'"
              ^ String.make (prefix_count + 1) (Char.of_int_exn (97 + (idx / 26) - 1))
              ^ String.make 1 (Char.of_int_exn (97 + suffix_idx)))
@@ -88,7 +88,7 @@ let rearr_typvars typ =
 ;;
 
 let rec pprint_type_tuple fmt =
-  let open Format in
+  let open Stdlib.Format in
   let open TypeExpr in
   function
   | [] -> ()
@@ -102,7 +102,7 @@ let rec pprint_type_tuple fmt =
      | _ -> fprintf fmt "%a * %a" pprint_type h pprint_type_tuple tl)
 
 and pprint_type_list_with_parens fmt ty_list =
-  let open Format in
+  let open Stdlib.Format in
   let rec print_types fmt = function
     | [] -> ()
     | [ ty ] -> pprint_type_with_parens_if_tuple fmt ty
@@ -123,7 +123,7 @@ and pprint_type fmt typ =
     | Type_var { contents = Link t } -> is_tuple t
     | _ -> false
   in
-  let open Format in
+  let open Stdlib.Format in
   match typ with
   | Type_arrow (t1, t2) when is_arrow t1 ->
     fprintf fmt "(%a) -> %a" pprint_type t1 pprint_type t2
@@ -148,7 +148,7 @@ and pprint_type fmt typ =
     fprintf fmt "%a %s" pprint_type_list_with_parens ty_list name
 
 and pprint_type_with_parens_if_tuple fmt ty =
-  let open Format in
+  let open Stdlib.Format in
   match ty with
   | Type_tuple _ -> fprintf fmt "(%a)" pprint_type ty
   | _ -> pprint_type fmt ty
@@ -165,7 +165,7 @@ let filter_env (env : (ident * TypeExpr.t) list) (names : ident list) =
 ;;
 
 let pprint_env env names =
-  let open Format in
+  let open Stdlib.Format in
   let new_env = filter_env env names in
   List.iter
     ~f:(fun (key, typ) ->
