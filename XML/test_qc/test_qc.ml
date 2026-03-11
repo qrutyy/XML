@@ -30,9 +30,9 @@ module AST = struct
   let _ = gen_sized
   let gen = QCheck.Gen.sized gen_sized
   let _ = gen
-  let arb_sized n = QCheck.make @@ gen_sized n
+  let arb_sized n = QCheck.make (gen_sized n)
   let _ = arb_sized
-  let arb = QCheck.make @@ gen
+  let arb = QCheck.make gen
 end
 
 module PP = struct

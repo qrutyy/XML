@@ -96,7 +96,7 @@ module List1 = struct
       (QCheck.Gen.pair gen_a (list_size (int_bound 5) gen_a))
   ;;
 
-  let arb gen_a = QCheck.make @@ gen gen_a
+  let arb gen_a = QCheck.make (gen gen_a)
 end
 
 module List2 = struct
@@ -108,8 +108,7 @@ module List2 = struct
       (QCheck.Gen.triple gen_a gen_a (QCheck.Gen.list gen_a))
   ;;
 
-  let _ = gen
-  let arb gen_a = QCheck.make @@ gen gen_a
+  let arb gen_a = QCheck.make (gen gen_a)
 end
 
 module Constant = struct
@@ -127,7 +126,7 @@ module Constant = struct
       ]
   ;;
 
-  let arb = QCheck.make @@ gen
+  let arb = QCheck.make gen
 end
 
 module TypeExpr = struct
@@ -187,10 +186,10 @@ module TypeExpr = struct
 
   let gen = QCheck.Gen.sized gen_sized
   let gen_tv = QCheck.Gen.sized gen_tv_sized
-  let arb_sized n = QCheck.make @@ gen_sized n
-  let arb_tv_sized n = QCheck.make @@ gen_tv_sized n
-  let arb = QCheck.make @@ gen
-  let arb_tv = QCheck.make @@ gen_tv
+  let arb_sized n = QCheck.make (gen_sized n)
+  let arb_tv_sized n = QCheck.make (gen_tv_sized n)
+  let arb = QCheck.make gen
+  let arb_tv = QCheck.make gen_tv
 end
 
 module Pattern = struct
@@ -234,8 +233,8 @@ module Pattern = struct
   ;;
 
   let gen = QCheck.Gen.sized gen_sized
-  let arb_sized n = QCheck.make @@ gen_sized n
-  let arb = QCheck.make @@ gen
+  let arb_sized n = QCheck.make (gen_sized n)
+  let arb = QCheck.make gen
 end
 
 module Expression = struct
@@ -249,7 +248,7 @@ module Expression = struct
       [ 1, QCheck.Gen.pure Nonrecursive; 1, QCheck.Gen.pure Recursive ]
   ;;
 
-  let arb_rec_flag = QCheck.make @@ gen_rec_flag
+  let arb_rec_flag = QCheck.make gen_rec_flag
 
   type 'expr value_binding =
     { pat : Pattern.t
@@ -361,8 +360,8 @@ module Expression = struct
   ;;
 
   let gen = QCheck.Gen.sized gen_sized
-  let arb_sized n = QCheck.make @@ gen_sized n
-  let arb = QCheck.make @@ gen
+  let arb_sized n = QCheck.make (gen_sized n)
+  let arb = QCheck.make gen
 end
 
 module Structure = struct
@@ -411,7 +410,7 @@ module Structure = struct
       ]
   ;;
 
-  let arb_structure_item = QCheck.make @@ gen_structure_item 10
+  let arb_structure_item = QCheck.make (gen_structure_item 10)
 end
 
 type program = Structure.structure_item list [@@deriving eq, show { with_path = false }]
