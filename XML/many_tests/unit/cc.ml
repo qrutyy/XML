@@ -57,3 +57,49 @@ to_cc {|
 |};
 [%expect {|
   let mkPair = (fun x -> (let add = ((fun x y -> x + y) x) in (let mul = ((fun x z -> x * z) x) in ((add x), (mul x)))));; |}]
+
+
+let%expect_test "if" =
+to_cc {|
+  let f =
+    let ret1 = 1 in
+    let ret2 = 2 in
+    let greater_10 x = if x > 10 then ret1 else ret2 in
+    greater_10
+|};
+[%expect {|
+  let f = (let ret1 = 1 in (let ret2 = 2 in (let greater_10 = ((fun ret1 ret2 x -> (if x > 10
+    then ret1
+    else ret2)) ret1) ret2 in (greater_10 ret1) ret2)));; |}]
+
+
+let%expect_test "tuple" =
+to_cc {|
+  let tuples =
+    let a, b = 10, 20 in
+    let to_tuple x = x, a, b in
+    to_tuple
+|};
+[%expect {|
+  let tuples = (let (a, b) = (10, 20) in (let to_tuple = ((fun a b x -> (x, a, b)) a) b in (to_tuple a) b));; |}]
+
+  
+let%expect_test "func" =
+to_cc {|
+  let f x y =
+    ((fun x -> fun x -> y) x) x
+|};
+[%expect {|
+  let f = (fun x y -> (((fun y x -> ((fun y x -> y) y)) y) x) x);; |}]
+
+    
+let%expect_test "load" =
+to_cc {|
+  let f x =
+    let g y =
+      let (a, b) = x, y in
+      a in g
+|};
+[%expect{| let f = (fun x -> (let g = ((fun x y -> (let (a, b) = (x, y) in a)) x) in (g x)));; |}]
+
+  
